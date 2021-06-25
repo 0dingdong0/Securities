@@ -2,6 +2,7 @@ import time
 import math
 import json
 import redis
+import shutil
 import asyncio
 import numpy as np
 from aredis import StrictRedis
@@ -29,10 +30,10 @@ for key in rd.keys():
 
 
 async def save(data):
-
+    print('启动协程：save dailydata ....')
     now = time.time()
     save_time = int(
-        time.mktime(time.strptime(f'{date} 15:00:30', '%Y-%m-%d %H:%M:%S')))
+        time.mktime(time.strptime(f'{date} 15:00:30', '%Y%m%d %H:%M:%S')))
 
     # save_time = data.check_points[-1]+10
 
@@ -40,9 +41,13 @@ async def save(data):
         await asyncio.sleep(save_time-now)
         data.save()
 
+    src = "D:\\workspace\\python\\Securities\\storage\\20210625.hdf5"
+    dst = "D:\网盘\OneDrive_odingdongo\OneDrive\share"
+    shutil.copy2(src, dst)
+
 
 async def start_snapshotting(assist_count):
-
+    print('启动协程：start_snapshotting ...')
     # await asyncio.sleep(int(time.mktime(time.strptime(f'{date} 09:14:00', '%Y-%m-%d %H:%M:%S'))) - time.time())
 
     # while await ar.get('hq_assist_count') is None:
@@ -61,7 +66,7 @@ async def start_snapshotting(assist_count):
 
 
 async def incremental_save(assist_count, check_points_length):
-
+    print('启动协程：incremental_save ...')
     # await asyncio.sleep(int(time.mktime(time.strptime(f'{time.strftime("%Y-%m-%d")} 09:14:30', '%Y-%m-%d %H:%M:%S'))) - time.time())
 
     # check_points_length = int(rd.get(f'hq_{date}_check_points_length'))
@@ -104,6 +109,7 @@ async def incremental_save(assist_count, check_points_length):
 
 async def main(symbols, check_points, assist_count):
 
+    print('初始化 DailyData ...')
     data = DailyData(date=date, symbols=symbols,
                      check_points=check_points, create=True)
 
@@ -122,13 +128,14 @@ if __name__ == '__main__':
     if not Utils.is_closed_day():
         now = time.time()
         initial_time = int(
-            time.mktime(time.strptime(f'{date} 09:10:30', '%Y-%m-%d %H:%M:%S'))
+            time.mktime(time.strptime(f'{date} 09:10:30', '%Y%m%d %H:%M:%S'))
         )
         # check_points = Utils.get_check_points(interval=5)
         # initial_time = check_points[0]-135
         # print(check_points, initial_time-now)
 
         if initial_time > now:
+            print('wait until 09:10:30')
             time.sleep(initial_time-now)
 
         Utils.update_symbols()
@@ -138,13 +145,23 @@ if __name__ == '__main__':
 
         rd.set(f'hq_assist_count', assist_count)
 
-        processes = []
-        for _ in range(assist_count):
-            proc = Process(target=assist, args=(_, assist_count))
-            processes.append(proc)
-            proc.start()
+        # processes = []
+        # for _ in range(assist_count):
+        #     proc = Process(target=assist, args=(_, assist_count))
+        #     processes.append(proc)
+        #     proc.start()
+        #     time.sleep(1)
 
         asyncio.run(main(symbols, check_points, assist_count))
 
-        for proc in processes:
-            proc.join()
+        # for proc in processes:
+        #     proc.join()
+
+        # msg = {'command': 'quit'}
+        # for _ in range(assist_count):
+        #     rd.lpush(f'hq_assist_{_}', json.dumps(msg))
+
+        from datetime import datetime
+        while True:
+            time.sleep(1)
+            print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} -> ~~~~~~~~~')

@@ -130,7 +130,7 @@ def assist(assist_idx, assist_count):
                     await ar.lpush(f'hq_assist_{assist_idx}_compute_statistics', json.dumps(error))
 
             elif msg['command'] == 'incremental_save':
-                dd = get_daily_data(msg['date'])
+                dd, scope = get_daily_data(msg['date'])
                 dd.incremental_save(msg['idx'])
 
             elif msg['command'] == 'quit':
