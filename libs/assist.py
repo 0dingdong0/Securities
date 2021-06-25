@@ -4,6 +4,8 @@ import json
 import redis
 import asyncio
 import traceback
+import numpy as np
+from datetime import datetime
 from aredis import StrictRedis
 from multiprocessing import Process
 
@@ -12,12 +14,15 @@ from libs.dailydata import DailyData
 from libs.utils import Utils
 from libs.cython.compute import compute_stats
 
+rd = redis.Redis(host='127.0.0.1', port=6379, db=8)
+ar = StrictRedis(host='127.0.0.1', port=6379, db=8)
+
+snapshot_handlers = []
+
 
 def assist(assist_idx, assist_count):
 
-    ar = StrictRedis(host='127.0.0.1', port=6379, db=8)
     data = {}
-    task_snapshotting = None
 
     def get_daily_data(date):
         if date not in data:
@@ -32,15 +37,9 @@ def assist(assist_idx, assist_count):
         return data[date]
 
     def compute_statistics(date):
-        #         dd = get_daily_data(date)
-        #         group_size = math.ceil(len(dd.symbols)/assist_count)
-        #         scope = (
-        #             assist_idx*group_size,
-        #             min((assist_idx+1)*group_size, len(dd.symbols))
-        #         )
         dd, scope = get_daily_data(date)
         basics = dd.basics[scope[0]:scope[1], :]
-        for _, check_point in enumerate(daily_data.check_points):
+        for _, check_point in enumerate(dd.check_points):
 
             snapshot = dd.snapshots[_, scope[0]:scope[1], :]
             statistic = dd.statistic[_, scope[0]:scope[1], :]
@@ -54,12 +53,6 @@ def assist(assist_idx, assist_count):
     async def snapshotting(date):
         try:
             dd, scope = get_daily_data(date)
-#             dd = get_daily_data(date)
-#             group_size = math.ceil(len(dd.symbols)/assist_count)
-#             scope = (
-#                 assist_idx*group_size,
-#                 min((assist_idx+1)*group_size, len(dd.symbols))
-#             )
 
             q = Quotation(symbols=dd.symbols.tolist()[scope[0]:scope[1]])
             basics = dd.basics[scope[0]:scope[1], :]
@@ -70,7 +63,6 @@ def assist(assist_idx, assist_count):
 
                 delay = (check_point-time.time())
                 await asyncio.sleep(max(delay, 0))
-#                 await asyncio.sleep(5)
 
                 try:
                     await q.snapshot(array=dd.snapshots[_, scope[0]:scope[1], :])
@@ -97,9 +89,10 @@ def assist(assist_idx, assist_count):
                     }
                     await ar.publish(f'hq_assist_{assist_idx}_snapshotting', json.dumps(error))
 
-#                 finally:
-#                     if assist_idx == 0:
-#                         dd.incremental_save(_)
+                # finally:
+                #     # 在这个地方进行增量存盘，会导致存盘数据不完整，因为不能确定最后一个完成当前 snapshot 的 assist
+                #     if assist_idx == 0:
+                #         dd.incremental_save(_)
 
         finally:
             await q.exit()
@@ -153,6 +146,71 @@ def assist(assist_idx, assist_count):
     # asyncio.create_task(main())
 
     return data
+
+
+async def start_snapshot_listening():
+
+    date = time.strftime('%Y%m%d')
+    check_points_length = int(rd.get(f'hq_{date}_check_points_length'))
+    assist_count = int(rd.get('hq_assist_count'))
+
+    results = [None for _ in range(assist_count)]
+    status = np.zeros(check_points_length, dtype=int)
+    status
+
+    def pre_handler(message):
+        assist_idx = str(message['channel']).split('_')[2]
+        data = json.loads(message['data'])
+        results[assist_idx] = data
+
+        check_point_idx = int(data['idx'])
+        status[check_point_idx] += 1
+
+        if status[check_point_idx] == assist_count:
+            for handler in snapshot_handlers:
+                handler(results[:])
+
+        # if data['status'] == 'successful':
+
+        #     if status[check_point_idx] == assist_count:
+        #         for handler in snapshot_handlers:
+        #             handler(data)
+        #     # print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} ss_handler:',
+        #     #       assist_idx, check_point_idx, status[check_point_idx])
+        # else:
+        #     print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} ss_handler:',
+        #           assist_idx, check_point_idx, message['data'])
+
+    p = ar.pubsub()
+    await p.psubscribe(**{'hq_assist_*_snapshotting': pre_handler})
+
+    while status[-1] != assist_count:
+
+        message = await p.get_message()
+
+#         if np.sum(status) >= assist_count:
+#             break
+
+    await asyncio.sleep(5)
+    await p.punsubscribe('hq_assist_*_snapshotting')
+    p.close()
+
+
+def add_snapshot_handler(handler):
+    if handler in snapshot_handlers:
+        return
+
+    snapshot_handlers.append(handler)
+
+
+def remove_snapshot_handler(handler):
+
+    if handler not in snapshot_handlers:
+        return
+
+    idx = snapshot_handlers.index(handler)
+    if idx != -1:
+        snapshot_handlers.pop(idx)
 
 
 if __name__ == '__main__':

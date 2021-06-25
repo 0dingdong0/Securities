@@ -4,13 +4,11 @@ import json
 import redis
 import shutil
 import asyncio
-import numpy as np
 from aredis import StrictRedis
-from multiprocessing import Process
 
-from libs.tdx import TDX
 from libs.utils import Utils
-from libs.assist import assist
+from libs.assist import start_snapshot_listening
+from libs.assist import add_snapshot_handler
 from libs.dailydata import DailyData
 
 policy = asyncio.WindowsSelectorEventLoopPolicy()
@@ -35,25 +33,17 @@ async def save(data):
     save_time = int(
         time.mktime(time.strptime(f'{date} 15:00:30', '%Y%m%d %H:%M:%S')))
 
-    # save_time = data.check_points[-1]+10
-
     if save_time > now:
         await asyncio.sleep(save_time-now)
         data.save()
 
-    src = "D:\\workspace\\python\\Securities\\storage\\20210625.hdf5"
-    dst = "D:\网盘\OneDrive_odingdongo\OneDrive\share"
-    shutil.copy2(src, dst)
+        src = "D:\\workspace\\python\\Securities\\storage\\20210625.hdf5"
+        dst = "D:\网盘\OneDrive_odingdongo\OneDrive\share"
+        shutil.copy2(src, dst)
 
 
 async def start_snapshotting(assist_count):
     print('启动协程：start_snapshotting ...')
-    # await asyncio.sleep(int(time.mktime(time.strptime(f'{date} 09:14:00', '%Y-%m-%d %H:%M:%S'))) - time.time())
-
-    # while await ar.get('hq_assist_count') is None:
-    #     await asyncio.sleep(1)
-
-    # assist_count = int(rd.get('hq_assist_count'))
 
     await asyncio.sleep(3)
     msg = {
@@ -65,46 +55,18 @@ async def start_snapshotting(assist_count):
         rd.lpush(f'hq_assist_{_}', json.dumps(msg))
 
 
-async def incremental_save(assist_count, check_points_length):
-    print('启动协程：incremental_save ...')
-    # await asyncio.sleep(int(time.mktime(time.strptime(f'{time.strftime("%Y-%m-%d")} 09:14:30', '%Y-%m-%d %H:%M:%S'))) - time.time())
-
-    # check_points_length = int(rd.get(f'hq_{date}_check_points_length'))
-    # assist_count = int(rd.get('hq_assist_count'))
-
-    subs = [ar.pubsub() for assist_idx in range(assist_count)]
-
-    results = await asyncio.gather(*[sub.subscribe(f'hq_assist_{_}_snapshotting') for _, sub in enumerate(subs)])
-    results = await asyncio.gather(*[sub.parse_response() for sub in subs])
-
-    # assert all([result[0] == b'subscribe' and result[-1]
-    #            == 1 for result in results])
-
-    while True:
-        results = await asyncio.gather(*[sub.parse_response() for sub in subs])
-        results = [json.loads(result[2]) for result in results]
-
-        if not all(
-            result['status'] == 'successful' and result['idx'] == results[0]['idx'] for result in results
-        ):
-            print('|||||||||||Error: Message in subscription has different check_points!')
-            continue
-
-        idx = results[0]['idx']
+def ss_handler_inc_save(results):
+    if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
         msg = {
             'command': 'incremental_save',
             'date': date,
-            'idx': idx
+            'idx': int(results[0]['idx'])
         }
-        rd.lpush(f'hq_assist_0', json.dumps(msg))
-
-        if idx+1 == check_points_length:
-            break
-
-    results = await asyncio.gather(*[sub.unsubscribe(f'hq_assist_{_}_snapshotting') for _, sub in enumerate(subs)])
-    results = await asyncio.gather(*[sub.parse_response() for sub in subs])
-    # assert all([result[0] == b'unsubscribe' and result[-1]
-    #            == 0 for result in results])
+        rd.lpush('hq_assist_0', json.dumps(msg))
+    else:
+        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
+        for result in results:
+            print('\n', result)
 
 
 async def main(symbols, check_points, assist_count):
@@ -114,13 +76,10 @@ async def main(symbols, check_points, assist_count):
                      check_points=check_points, create=True)
 
     await data.prepare(symbols, check_points)
-    # task_prepare = asyncio.create_task(data.prepare(symbols, check_points))
-    # while not task_prepare.done():
-    #     print('wait data prepare', task_prepare)
-    #     time.sleep(1)
     data.save()
 
-    await asyncio.gather(*[incremental_save(assist_count, len(check_points)), start_snapshotting(assist_count), save(data)])
+    add_snapshot_handler(ss_handler_inc_save)
+    await asyncio.gather(*[start_snapshot_listening(), start_snapshotting(assist_count), save(data)])
 
 
 if __name__ == '__main__':
@@ -130,9 +89,6 @@ if __name__ == '__main__':
         initial_time = int(
             time.mktime(time.strptime(f'{date} 09:10:30', '%Y%m%d %H:%M:%S'))
         )
-        # check_points = Utils.get_check_points(interval=5)
-        # initial_time = check_points[0]-135
-        # print(check_points, initial_time-now)
 
         if initial_time > now:
             print('wait until 09:10:30')
@@ -145,21 +101,7 @@ if __name__ == '__main__':
 
         rd.set(f'hq_assist_count', assist_count)
 
-        # processes = []
-        # for _ in range(assist_count):
-        #     proc = Process(target=assist, args=(_, assist_count))
-        #     processes.append(proc)
-        #     proc.start()
-        #     time.sleep(1)
-
         asyncio.run(main(symbols, check_points, assist_count))
-
-        # for proc in processes:
-        #     proc.join()
-
-        # msg = {'command': 'quit'}
-        # for _ in range(assist_count):
-        #     rd.lpush(f'hq_assist_{_}', json.dumps(msg))
 
         from datetime import datetime
         while True:
