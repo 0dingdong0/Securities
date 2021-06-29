@@ -159,7 +159,7 @@ async def start_snapshot_listening():
     status
 
     def pre_handler(message):
-        assist_idx = str(message['channel']).split('_')[2]
+        assist_idx = int(str(message['channel']).split('_')[2])
         data = json.loads(message['data'])
         results[assist_idx] = data
 
