@@ -65,9 +65,9 @@ def ss_handler_inc_save(results):
         }
         rd.lpush('hq_assist_0', json.dumps(msg))
     else:
-        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
+        print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
         for result in results:
-            print('\n', result)
+            print(result)
 
 
 async def main(symbols, check_points, assist_count):
