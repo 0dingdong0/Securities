@@ -369,13 +369,16 @@ class DailyData:
         self.shm_statistic.unlink()
 
     def incremental_save(self, idx):
-        if not hasattr(self, 'hdf5'):
-            if not os.path.exists(self.hdf5_file):
-                return 'file['+self.hdf5_file+'] does not exists!'
-            self.hdf5 = h5py.File(self.hdf5_file, 'r+')
+        # if not hasattr(self, 'hdf5'):
+        #     if not os.path.exists(self.hdf5_file):
+        #         return 'file['+self.hdf5_file+'] does not exists!'
+        #     self.hdf5 = h5py.File(self.hdf5_file, 'r+')
 
-        self.hdf5[u'snapshots'][idx] = self.snapshots[idx]
-        self.hdf5.flush()
+        # self.hdf5[u'snapshots'][idx] = self.snapshots[idx]
+        # self.hdf5.flush()
+
+        with h5py.File(self.hdf5_file, "r+") as f:
+            f[u'snapshots'][idx] = self.snapshots[idx]
 
 
 # class DailyData:
