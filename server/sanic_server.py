@@ -13,7 +13,17 @@ app = Sanic("My Hello, world app")
 app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
 
+# todo: setup app.ctx.data = {}, date => dailydata
+app.ctx.queues = []
 
+async def snapshot_handler(results):
+    if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
+        # todo: notify updates
+        pass
+    else:
+        print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
+        for result in results:
+            print(result)
 
 @app.on_request
 async def identify_user_id(request):
@@ -56,24 +66,20 @@ async def fenshi(request, symbol):
     return text(f'Hello, world! {date} {ts}')
 
 
-@app.websocket("/realtime/<room>")
-async def realtime(request, ws, room):
+@app.websocket("/websocket/<room>")
+async def websocket(request, ws, room):
+    # todo: create queue and add to app.ctx.queues
+    queue = asyncio.Queue()
+    app.ctx.queue.append(queue)
+
     msg = "hello"
     while True:
+        # todo: wait for any : ws.recv(), queue.get()
         await ws.send(msg)
         msg = await ws.recv()
 
+    # todo: remove queue from app.ctx.queues when ws closed
 
-@app.get("/subscribe")
-async def subscribe(request):
-    symbols = request.args.getlist("symbols")
-    pass
-
-
-@app.get("/unsubscribe")
-async def unsubscribe(request):
-    symbols = request.args.getlist("symbols")
-    pass
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=1234, debug=True)
