@@ -1,5 +1,6 @@
 import time
 import uuid
+import asyncio
 from sanic import Sanic
 from datetime import datetime
 from sanic.models.handler_types import RequestMiddlewareType
@@ -11,6 +12,7 @@ app = Sanic("My Hello, world app")
 
 app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
+
 
 
 @app.on_request
@@ -32,7 +34,7 @@ async def market(request, date):
     ts = request.args.get("ts")
     if ts is None:
         ts = time.time()
-    return text(f'daily_data(): {date} {ts} {request.id}')
+    return text(f'daily_data(): {date}, {ts}, {request.id}')
 
 
 @app.get("/kline/<symbol>")
