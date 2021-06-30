@@ -156,7 +156,6 @@ async def start_snapshot_listening():
 
     results = [None for _ in range(assist_count)]
     status = np.zeros(check_points_length, dtype=int)
-    status
 
     def pre_handler(message):
         assist_idx = int(str(message['channel']).split('_')[2])
@@ -168,7 +167,10 @@ async def start_snapshot_listening():
 
         if status[check_point_idx] == assist_count:
             for handler in snapshot_handlers:
-                handler(results[:])
+                if asyncio.iscoroutinefunction(handler):
+                    asyncio.creat_task(handler(results[:]))
+                else:
+                    handler(results[:])
 
         # if data['status'] == 'successful':
 
