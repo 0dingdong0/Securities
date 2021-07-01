@@ -1,7 +1,6 @@
-import os
-import sys
 import time
 import uuid
+import json
 import asyncio
 from sanic import Sanic
 from pathlib import Path
@@ -10,12 +9,10 @@ from sanic.models.handler_types import RequestMiddlewareType
 from sanic.response import text
 from sanic.response import json
 
+from libs.dailydata import DailyData
 from libs.assist import start_snapshot_listening
 from libs.assist import add_snapshot_handler
 
-# currentdir = os.path.dirname(os.path.realpath(__file__))
-# parentdir = os.path.dirname(currentdir)
-# sys.path.append(parentdir)
 
 app = Sanic("My Hello, world app")
 
@@ -24,18 +21,44 @@ app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
 
 # todo: setup app.ctx.data = {}, date => dailydata
-app.ctx.queues = []
+app.ctx.data = {}
+
+# { request.ctx.user_id => { ws_client_id => queue } }
+app.ctx.queues = {}
 
 
 async def snapshot_handler(results):
     if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
         # todo: notify updates
+        check_point_idx = int(results[0]['idx'])
+        print('snapshotting', check_point_idx)
+        
+        await asyncio.gather(*[queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([ list(kv.values()) for kv in [kv for kv in app.ctx.queues.values()]],[])])
         pass
     else:
         print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
         for result in results:
             print(result)
 
+# before server start
+@app.before_server_start
+async def setup_dailydata(app, loop):
+    # date = time.strftime('%Y%m%d')
+    date = '20210624'
+    app.ctx.data[date] = DailyData(date)
+    print('before server start')
+
+@app.after_server_start
+async def add_snapshotting_handler(app, loop):
+    add_snapshot_handler(snapshot_handler)
+    # asyncio.create_task(start_snapshot_listening())
+    asyncio.create_task(start_snapshot_listening(date='20210624'))
+    print('add snapshotting handler')
+
+# after server stop
+@app.after_server_stop
+async def cleanup_dailydata(app, loop):
+    print('after_server_stop')
 
 @app.on_request
 async def identify_user_id(request):
@@ -43,6 +66,7 @@ async def identify_user_id(request):
         request.ctx.user_id = request.cookies.get('user_id')
     else:
         request.ctx.user_id = str(uuid.uuid4())
+        app.ctx.queues[request.ctx.user_id] = {}
 
 
 @app.on_response
@@ -78,19 +102,37 @@ async def fenshi(request, symbol):
     return text(f'Hello, world! {date} {ts}')
 
 
-@app.websocket("/websocket/<room>")
-async def websocket(request, ws, room):
-    # todo: create queue and add to app.ctx.queues
+@app.websocket("/websocket/<ws_client_id>")
+async def websocket(request, ws, ws_client_id):
+    print('websocket_client_id:', ws_client_id)
     queue = asyncio.Queue()
-    app.ctx.queue.append(queue)
+    app.ctx.queues[request.ctx.user_id][ws_client_id] = queue
 
-    msg = "hello"
+    tasks = [
+        asyncio.create_task(ws.recv(), name='ws.recv()'), 
+        asyncio.create_task(queue.get(), name='queue.get()')
+    ]
+
     while True:
-        # todo: wait for any : ws.recv(), queue.get()
-        await ws.send(msg)
-        msg = await ws.recv()
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
+        tasks = list(pending)
+
+        print('done tasks:')
+        for task in done:
+            task_name = task.get_name()
+            result = task.result()
+            print(task_name, type(result), result)
+
+            if task_name == 'ws.recv()':
+                tasks.append(asyncio.create_task(ws.recv(), name='ws.recv()'))
+            else:
+                tasks.append(asyncio.create_task(queue.get(), name='queue.get()'))
+                asyncio.create_task(ws.send(str(result['idx'])))
+            
+        # break
     # todo: remove queue from app.ctx.queues when ws closed
+    
 
 
 if __name__ == "__main__":

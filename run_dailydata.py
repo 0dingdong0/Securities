@@ -38,7 +38,7 @@ async def save(data):
         await asyncio.sleep(save_time-now)
         data.save()
 
-        src = "D:\\workspace\\python\\Securities\\storage\\20210625.hdf5"
+        src = f'D:\\workspace\\python\\Securities\\storage\\{date}.hdf5'
         dst = "D:\网盘\OneDrive_odingdongo\OneDrive\share"
         shutil.copy2(src, dst)
 
