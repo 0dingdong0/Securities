@@ -103,8 +103,3 @@ if __name__ == '__main__':
         rd.set(f'hq_assist_count', assist_count)
 
         asyncio.run(main(symbols, check_points, assist_count))
-
-        from datetime import datetime
-        while True:
-            time.sleep(1)
-            print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} -> ~~~~~~~~~')

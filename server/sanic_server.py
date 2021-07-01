@@ -1,11 +1,21 @@
+import os
+import sys
 import time
 import uuid
 import asyncio
 from sanic import Sanic
+from pathlib import Path
 from datetime import datetime
 from sanic.models.handler_types import RequestMiddlewareType
 from sanic.response import text
 from sanic.response import json
+
+from libs.assist import start_snapshot_listening
+from libs.assist import add_snapshot_handler
+
+# currentdir = os.path.dirname(os.path.realpath(__file__))
+# parentdir = os.path.dirname(currentdir)
+# sys.path.append(parentdir)
 
 app = Sanic("My Hello, world app")
 
@@ -16,6 +26,7 @@ app.static("/static", "server/static/")
 # todo: setup app.ctx.data = {}, date => dailydata
 app.ctx.queues = []
 
+
 async def snapshot_handler(results):
     if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
         # todo: notify updates
@@ -24,6 +35,7 @@ async def snapshot_handler(results):
         print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
         for result in results:
             print(result)
+
 
 @app.on_request
 async def identify_user_id(request):
