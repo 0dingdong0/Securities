@@ -52,7 +52,7 @@ async def setup_dailydata(app, loop):
 async def add_snapshotting_handler(app, loop):
     add_snapshot_handler(snapshot_handler)
     # asyncio.create_task(start_snapshot_listening())
-    asyncio.create_task(start_snapshot_listening(date='20210624'))
+    asyncio.create_task(start_snapshot_listening(date='20210702'))
     print('add snapshotting handler')
 
 # after server stop
