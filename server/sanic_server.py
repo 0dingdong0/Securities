@@ -44,7 +44,7 @@ async def snapshot_handler(results):
 @app.before_server_start
 async def setup_dailydata(app, loop):
     # date = time.strftime('%Y%m%d')
-    date = '20210624'
+    date = '20210702'
     app.ctx.data[date] = DailyData(date)
     print('before server start')
 
