@@ -104,7 +104,8 @@ def assist(assist_idx, assist_count):
         while True:
             key, value = await ar.brpop(f'hq_assist_{assist_idx}')
             msg = json.loads(value)
-            print(f'Assist[{assist_idx}] {msg}')
+            print(
+                f'{datetime.now().strftime("%H:%M:%S")}: Assist[{assist_idx}] {msg}')
 
             if msg['command'] == 'snapshotting':
                 snapshotting_task = asyncio.create_task(
