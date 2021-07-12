@@ -6,6 +6,9 @@ from sanic import Sanic
 from pathlib import Path
 from datetime import datetime
 from sanic.models.handler_types import RequestMiddlewareType
+from websockets.exceptions import ConnectionClosedOK
+from asyncio.exceptions import CancelledError
+
 from sanic.response import text
 from sanic.response import json
 
@@ -33,8 +36,8 @@ async def snapshot_handler(results):
         check_point_idx = int(results[0]['idx'])
         print('snapshotting', check_point_idx)
         
-        await asyncio.gather(*[queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([ list(kv.values()) for kv in [kv for kv in app.ctx.queues.values()]],[])])
-        pass
+        await asyncio.gather(*[ queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([ list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues],[]) ])
+        # pass
     else:
         print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
         for result in results:
@@ -44,7 +47,7 @@ async def snapshot_handler(results):
 @app.before_server_start
 async def setup_dailydata(app, loop):
     # date = time.strftime('%Y%m%d')
-    date = '20210702'
+    date = '20210712'
     app.ctx.data[date] = DailyData(date)
     print('before server start')
 
@@ -52,7 +55,7 @@ async def setup_dailydata(app, loop):
 async def add_snapshotting_handler(app, loop):
     add_snapshot_handler(snapshot_handler)
     # asyncio.create_task(start_snapshot_listening())
-    asyncio.create_task(start_snapshot_listening(date='20210702'))
+    asyncio.create_task(start_snapshot_listening(date='20210712'))
     print('add snapshotting handler')
 
 # after server stop
@@ -104,34 +107,40 @@ async def fenshi(request, symbol):
 
 @app.websocket("/websocket/<ws_client_id>")
 async def websocket(request, ws, ws_client_id):
-    print('websocket_client_id:', ws_client_id)
-    queue = asyncio.Queue()
-    app.ctx.queues[request.ctx.user_id][ws_client_id] = queue
+    try:
+        print('websocket_client_id:', ws_client_id)
+        queue = asyncio.Queue()
+        app.ctx.queues[request.ctx.user_id][ws_client_id] = queue
 
-    tasks = [
-        asyncio.create_task(ws.recv(), name='ws.recv()'), 
-        asyncio.create_task(queue.get(), name='queue.get()')
-    ]
+        tasks = [
+            asyncio.create_task(ws.recv(), name='ws.recv()'), 
+            asyncio.create_task(queue.get(), name='queue.get()')
+        ]
+        
+        while True:
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
-    while True:
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            tasks = list(pending)
 
-        tasks = list(pending)
+            print('done tasks:')
+            for task in done:
+                task_name = task.get_name()
+                result = task.result()
+                print('====', task_name, type(result), result)
+                if task_name == 'ws.recv()':
+                    tasks.append(asyncio.create_task(ws.recv(), name='ws.recv()'))
+                else:
+                    tasks.append(asyncio.create_task(queue.get(), name='queue.get()'))
+                    asyncio.create_task(ws.send(str(result['idx'])))
+                
+            # break
+    except CancelledError as e:
+        print('||||||||||||||||||connection closed:', ws_client_id, request.ctx.user_id, type(e))
+        pass
+    finally:
+        print('||||||||||||||||||todo: remove queue from app.ctx.queues:', ws_client_id, request.ctx.user_id)
+        # todo: remove queue from app.ctx.queues
 
-        print('done tasks:')
-        for task in done:
-            task_name = task.get_name()
-            result = task.result()
-            print(task_name, type(result), result)
-
-            if task_name == 'ws.recv()':
-                tasks.append(asyncio.create_task(ws.recv(), name='ws.recv()'))
-            else:
-                tasks.append(asyncio.create_task(queue.get(), name='queue.get()'))
-                asyncio.create_task(ws.send(str(result['idx'])))
-            
-        # break
-    # todo: remove queue from app.ctx.queues when ws closed
     
 
 
