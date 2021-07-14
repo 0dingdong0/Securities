@@ -2,6 +2,7 @@ import time
 import uuid
 import json
 import asyncio
+import traceback
 from sanic import Sanic
 from pathlib import Path
 from datetime import datetime
@@ -35,8 +36,8 @@ async def snapshot_handler(results):
         # todo: notify updates
         check_point_idx = int(results[0]['idx'])
         print('snapshotting', check_point_idx)
-        
-        await asyncio.gather(*[ queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([ list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues],[]) ])
+
+        await asyncio.gather(*[queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues], [])])
         # pass
     else:
         print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
@@ -44,24 +45,30 @@ async def snapshot_handler(results):
             print(result)
 
 # before server start
+
+
 @app.before_server_start
 async def setup_dailydata(app, loop):
     # date = time.strftime('%Y%m%d')
-    date = '20210712'
+    date = '20210714'
     app.ctx.data[date] = DailyData(date)
     print('before server start')
+
 
 @app.after_server_start
 async def add_snapshotting_handler(app, loop):
     add_snapshot_handler(snapshot_handler)
     # asyncio.create_task(start_snapshot_listening())
-    asyncio.create_task(start_snapshot_listening(date='20210712'))
+    asyncio.create_task(start_snapshot_listening(date='20210714'))
     print('add snapshotting handler')
 
 # after server stop
+
+
 @app.after_server_stop
 async def cleanup_dailydata(app, loop):
     print('after_server_stop')
+
 
 @app.on_request
 async def identify_user_id(request):
@@ -110,13 +117,15 @@ async def websocket(request, ws, ws_client_id):
     try:
         print('websocket_client_id:', ws_client_id)
         queue = asyncio.Queue()
+        if request.ctx.user_id not in app.ctx.queues:
+            app.ctx.queues[request.ctx.user_id] = {}
         app.ctx.queues[request.ctx.user_id][ws_client_id] = queue
 
         tasks = [
-            asyncio.create_task(ws.recv(), name='ws.recv()'), 
+            asyncio.create_task(ws.recv(), name='ws.recv()'),
             asyncio.create_task(queue.get(), name='queue.get()')
         ]
-        
+
         while True:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
@@ -128,20 +137,24 @@ async def websocket(request, ws, ws_client_id):
                 result = task.result()
                 print('====', task_name, type(result), result)
                 if task_name == 'ws.recv()':
-                    tasks.append(asyncio.create_task(ws.recv(), name='ws.recv()'))
+                    tasks.append(asyncio.create_task(
+                        ws.recv(), name='ws.recv()'))
                 else:
-                    tasks.append(asyncio.create_task(queue.get(), name='queue.get()'))
+                    tasks.append(asyncio.create_task(
+                        queue.get(), name='queue.get()'))
                     asyncio.create_task(ws.send(str(result['idx'])))
-                
-            # break
-    except CancelledError as e:
-        print('||||||||||||||||||connection closed:', ws_client_id, request.ctx.user_id, type(e))
-        pass
-    finally:
-        print('||||||||||||||||||todo: remove queue from app.ctx.queues:', ws_client_id, request.ctx.user_id)
-        # todo: remove queue from app.ctx.queues
 
-    
+            # break
+    except Exception as e:
+        print(str(e))
+        traceback.print_exc()
+    finally:
+        # remove queue from app.ctx.queues
+        del app.ctx.queues[request.ctx.user_id][ws_client_id]
+        # cancel running tasks
+        for task in tasks:
+            if not task.done():
+                task.cancel()
 
 
 if __name__ == "__main__":
