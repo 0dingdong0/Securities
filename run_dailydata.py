@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime
 from aredis import StrictRedis
 
+from libs.tdx import TDX
 from libs.utils import Utils
 from libs.assist import start_snapshot_listening
 from libs.assist import add_snapshot_handler
@@ -39,7 +40,17 @@ async def save(data):
         data.save()
 
         src = f'D:\\workspace\\python\\Securities\\storage\\{date}.hdf5'
-        dst = "D:\网盘\OneDrive_odingdongo\OneDrive\share"
+        dst = "D:\\网盘\OneDrive_odingdongo\OneDrive\share"
+        shutil.copy2(src, dst)
+
+        tdx = TDX()
+        zhishu = tdx.get_tdx_zhishu()
+        zhishu_file = 'storage\\'+date+'_zhishu.json'
+        with open(zhishu_file, 'w', encoding='utf-8') as f:
+            json.dump(zhishu, f)
+
+        src = f'D:\\workspace\\python\\Securities\\{zhishu_file}'
+        dst = "D:\\网盘\OneDrive_odingdongo\OneDrive\share"
         shutil.copy2(src, dst)
 
 

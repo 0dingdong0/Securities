@@ -1,3 +1,4 @@
+import os
 import time
 import uuid
 import json
@@ -11,8 +12,9 @@ from websockets.exceptions import ConnectionClosedOK
 from asyncio.exceptions import CancelledError
 
 from sanic.response import text
-from sanic.response import json
+# from sanic.response import json
 
+from libs.tdx import TDX
 from libs.dailydata import DailyData
 from libs.assist import start_snapshot_listening
 from libs.assist import add_snapshot_handler
@@ -87,9 +89,27 @@ async def set_user_id(request, response):
 
 @app.get("/market/<date>")
 async def market(request, date):
+    init = request.args.get("init")
     ts = request.args.get("ts")
+
+    result = {}
+    if init is not None:
+        file = 'storage//'+time.strftime('%Y%m%d')+'_zhishu.json'
+        if os.path.exists(file):
+            with open('storage//'+time.strftime('%Y%m%d')+'_zhishu.json', 'r') as f:
+                result['zhishu'] = json.load(f)
+        else:
+            tdx = TDX()
+            result['zhishu'] = tdx.get_tdx_zhishu()
+
+        result['symbols'] = ''
+        result['names'] = ''
+        pass
+
     if ts is None:
         ts = time.time()
+        pass
+
     return text(f'daily_data(): {date}, {ts}, {request.id}')
 
 
