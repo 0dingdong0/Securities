@@ -11,8 +11,7 @@ from sanic.models.handler_types import RequestMiddlewareType
 from websockets.exceptions import ConnectionClosedOK
 from asyncio.exceptions import CancelledError
 
-from sanic.response import text
-# from sanic.response import json
+from sanic import response
 
 from libs.tdx import TDX
 from libs.dailydata import DailyData
@@ -25,6 +24,7 @@ app = Sanic("My Hello, world app")
 
 app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
+app.static("/", "server/static/html/index.html")
 
 # todo: setup app.ctx.data = {}, date => dailydata
 app.ctx.data = {}
@@ -52,7 +52,7 @@ async def snapshot_handler(results):
 @app.before_server_start
 async def setup_dailydata(app, loop):
     # date = time.strftime('%Y%m%d')
-    date = '20210714'
+    date = '20210712'
     app.ctx.data[date] = DailyData(date)
     print('before server start')
 
@@ -61,7 +61,7 @@ async def setup_dailydata(app, loop):
 async def add_snapshotting_handler(app, loop):
     add_snapshot_handler(snapshot_handler)
     # asyncio.create_task(start_snapshot_listening())
-    asyncio.create_task(start_snapshot_listening(date='20210714'))
+    asyncio.create_task(start_snapshot_listening(date='20210712'))
     print('add snapshotting handler')
 
 # after server stop
@@ -87,14 +87,38 @@ async def set_user_id(request, response):
         response.cookies['user_id'] = request.ctx.user_id
 
 
-@app.get("/market/<date>")
+@app.get("/market/<date:\d{8}>")
 async def market(request, date):
-    init = request.args.get("init")
-    ts = request.args.get("ts")
+    
+    if date not in app.ctx.data:
+        try:
+            app.ctx.data[date] = DailyData(date)
+        except FileNotFoundError:
+            file = os.path.join(os.getcwd(), 'storage', f'{date}.hdf5')
+            if os.path.exists(file):
+                app.ctx.data[date] = DailyData.load(dt=date)
+            else:
+                # todo: return error
+                pass
+            
+    dailydata = app.ctx.data[date]
 
-    result = {}
+    init = request.args.get("init")
+    timestamp = float(request.args.get("timestamp"))
+
+    print(os.getcwd())
+    print(init, timestamp)
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
+
+    result = {'date': date, 'request_id': str(request.id)}
+    if init:
+        result['init'] = True
+    
+    if timestamp:
+        result['timestamp'] = timestamp
+
     if init is not None:
-        file = 'storage//'+time.strftime('%Y%m%d')+'_zhishu.json'
+        file = 'storage//'+date+'_zhishu.json'
         if os.path.exists(file):
             with open('storage//'+time.strftime('%Y%m%d')+'_zhishu.json', 'r') as f:
                 result['zhishu'] = json.load(f)
@@ -106,18 +130,18 @@ async def market(request, date):
         result['names'] = ''
         pass
 
-    if ts is None:
+    if timestamp is None:
         ts = time.time()
         pass
 
-    return text(f'daily_data(): {date}, {ts}, {request.id}')
+    return response.json(result)
 
 
 @app.get("/kline/<symbol>")
 async def kline(request, symbol):
     start_date = request.args.get("start")
     end_date = request.args.get("end")
-    return text(f'Hello, world! {start_date} {end_date}')
+    return response.text(f'Hello, world! {start_date} {end_date}')
 
 
 @app.get("/fenshi/<symbol>")
@@ -129,7 +153,7 @@ async def fenshi(request, symbol):
     ts = request.args.get("ts")
     if ts is None:
         ts = time.time()
-    return text(f'Hello, world! {date} {ts}')
+    return response.text(f'Hello, world! {date} {ts}')
 
 
 @app.websocket("/websocket/<ws_client_id>")
