@@ -1,10 +1,15 @@
 import os
+import math
 import time
 import uuid
 import json
 import asyncio
 import traceback
+import numpy as np
+
+from aredis import StrictRedis
 from sanic import Sanic
+from sanic import exceptions
 from pathlib import Path
 from datetime import datetime
 from sanic.models.handler_types import RequestMiddlewareType
@@ -25,6 +30,9 @@ app = Sanic("My Hello, world app")
 app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
 app.static("/", "server/static/html/index.html")
+
+
+app.ctx.ar = StrictRedis(host='127.0.0.1', port=6379, db=8)
 
 # todo: setup app.ctx.data = {}, date => dailydata
 app.ctx.data = {}
@@ -97,27 +105,52 @@ async def market(request, date):
             file = os.path.join(os.getcwd(), 'storage', f'{date}.hdf5')
             if os.path.exists(file):
                 app.ctx.data[date] = DailyData.load(dt=date)
+                if not (await app.ctx.ar.get('hq_assist_count')):
+                    assist_count = math.ceil(len(app.ctx.data[date].symbols)/800)+1
+                    await app.ctx.ar.set('hq_assist_count', assist_count)
+                assist_count = await app.ctx.ar.get('hq_assist_count')
+                
+                msg = {
+                    'command': 'compute_statistics',
+                    'date': date
+                }
+                await asyncio.gather(
+                    *[app.ctx.ar.lpush(f'hq_assist_{_}', json.dumps(msg)) for _ in range(assist_count)]
+                )
+                results = await asyncio.gather(*[ app.ctx.ar.brpop(f'hq_assist_{_}_compute_statistics') for _ in range(assist_count)])
+                if not all([json.loads(result[1].decode("utf-8"))['status'] =='success' for result in results]):
+                    raise exceptions.ServerError(f"Failed to calculate statistics for dailydata at ({date})")
             else:
-                # todo: return error
-                pass
+                raise exceptions.NotFound(f"Could not find dailydata at ({date})")
             
     dailydata = app.ctx.data[date]
 
     init = request.args.get("init")
     timestamp = float(request.args.get("timestamp"))
+    
+    if timestamp is None:
+        timestamp = time.time()
 
     print(os.getcwd())
     print(init, timestamp)
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
 
-    result = {'date': date, 'request_id': str(request.id)}
-    if init:
-        result['init'] = True
+    result = {'date': date, 'timestamp': timestamp, 'request_id': str(request.id)}
+    # result = {'date': date, 'timestamp': timestamp}
     
-    if timestamp:
-        result['timestamp'] = timestamp
+    if timestamp <= dailydata.check_points[0]:
+        check_point_idx = 0
+    elif timestamp >= dailydata.check_points[-1]:
+        check_point_idx = len(dailydata.check_points)-1
+    else:
+        check_point_idx = np.argmax(dailydata.check_points > timestamp) - 1
 
-    if init is not None:
+    result['zs_indices'] = np.argsort(dailydata.statistic[check_point_idx,:,3]).tolist()
+    result['zt_indices'] = np.argwhere(dailydata.statistic[check_point_idx,:,4]>0).tolist()
+    result['zf_indices'] = np.argsort(dailydata.statistic[check_point_idx,:,0]).tolist()
+    result['lb_indices'] = np.argsort(dailydata.statistic[check_point_idx,:,2]).tolist()
+        
+    if init:
         file = 'storage//'+date+'_zhishu.json'
         if os.path.exists(file):
             with open('storage//'+time.strftime('%Y%m%d')+'_zhishu.json', 'r') as f:
@@ -126,13 +159,14 @@ async def market(request, date):
             tdx = TDX()
             result['zhishu'] = tdx.get_tdx_zhishu()
 
-        result['symbols'] = ''
-        result['names'] = ''
-        pass
-
-    if timestamp is None:
-        ts = time.time()
-        pass
+        result['symbols'] = dailydata.symbols.tolist()
+        result['names'] = dailydata.names.tolist()
+        result['zt_status'] = list([ 
+            ( 
+                int(idx[0]),
+                int(dailydata.check_points[np.argmax(dailydata.statistic[:,idx[0],4]>0)])
+            ) for idx in np.argwhere(dailydata.statistic[check_point_idx,:,4]>0)
+        ])
 
     return response.json(result)
 

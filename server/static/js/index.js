@@ -19,7 +19,9 @@
 
 
 window.onload = function(){
-    let date = moment().format('YYYYMMDD')
+    // let date = moment().format('YYYYMMDD')
+    let date = '20210712'
+    
     let timestamp = moment()/1000
     let init = true
 
@@ -27,7 +29,7 @@ window.onload = function(){
 
     let params = {
         init: init,
-        'timestamp' : timestamp
+        'timestamp' : 1626068690
     }
 
     axios.get(`/market/${date}`, {'params':params})
