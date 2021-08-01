@@ -125,14 +125,12 @@ async def market(request, date):
             
     dailydata = app.ctx.data[date]
 
-    init = request.args.get("init")
-    timestamp = float(request.args.get("timestamp"))
     
-    if timestamp is None:
+    if "timestamp" in request.args:
+        timestamp = float(request.args.get("timestamp"))
+    else:
         timestamp = time.time()
 
-    print(os.getcwd())
-    print(init, timestamp)
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
 
     result = {'date': date, 'timestamp': timestamp, 'request_id': str(request.id)}
@@ -150,6 +148,7 @@ async def market(request, date):
     result['zf_indices'] = np.argsort(dailydata.statistic[check_point_idx,:,0]).tolist()
     result['lb_indices'] = np.argsort(dailydata.statistic[check_point_idx,:,2]).tolist()
         
+    init = request.args.get("init")
     if init:
         file = 'storage//'+date+'_zhishu.json'
         if os.path.exists(file):
@@ -164,7 +163,7 @@ async def market(request, date):
         result['zt_status'] = list([ 
             ( 
                 int(idx[0]),
-                int(dailydata.check_points[np.argmax(dailydata.statistic[:,idx[0],4]>0)])
+                int(dailydata.check_points[np.argmax(dailydata.statistic[:check_point_idx+1,idx[0],4]>0)])
             ) for idx in np.argwhere(dailydata.statistic[check_point_idx,:,4]>0)
         ])
 

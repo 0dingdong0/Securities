@@ -29,13 +29,15 @@ window.onload = function(){
 
     let params = {
         init: init,
-        'timestamp' : 1626068690
+        // 'timestamp' : 1626068690
     }
 
     axios.get(`/market/${date}`, {'params':params})
     .then((response)=>{
+        console.log('-----------------------')
         console.log(response)
     }).catch((error)=>{
         console.log(error)
     })
 }
+
