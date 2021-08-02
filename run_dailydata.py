@@ -52,6 +52,11 @@ async def save(data):
         src = f'D:\\workspace\\python\\Securities\\{zhishu_file}'
         dst = "D:\\网盘\OneDrive_odingdongo\OneDrive\share"
         shutil.copy2(src, dst)
+        
+        msg = { 'command': 'quit' }
+
+        for _ in range(assist_count):
+            rd.lpush(f'hq_assist_{_}', json.dumps(msg))
 
 
 async def start_snapshotting(assist_count):
