@@ -5,8 +5,7 @@ import redis
 import tushare as ts
 
 ts.set_token('aecca28adc0d5a7764b748ccd48bef923d81314ae47b4d44d51fce67')
-tsp = ts.pro_api()
-
+# tsp = ts.pro_api()
 
 class Utils:
 
@@ -14,7 +13,7 @@ class Utils:
     SYMBOLS_FILE = os.path.join(os.getcwd(), "symbols.json")
     SUSPENDED_SYMBOLS_FILE = os.path.join(
         os.getcwd(), "suspended_symbols.json")
-
+        
     @staticmethod
     def get_symbols():
         if not os.path.exists(Utils.SYMBOLS_FILE):
@@ -37,7 +36,11 @@ class Utils:
 
     @staticmethod
     def update_symbols():
-        df = tsp.stock_basic(
+
+        if Utils.tsp is None:
+            Utils.tsp = ts.pro_api()
+
+        df = Utils.tsp.stock_basic(
             fields='symbol,name,market,area,industry,list_date')
         df = df.loc[df['list_date'] <= time.strftime(
             '%Y%m%d', time.localtime())]
@@ -46,13 +49,17 @@ class Utils:
             f.write(json.dumps(symbols))
 
         today = time.strftime('%Y%m%d')
-        suspended_symbols = list([x[:6] for x in tsp.suspend_d(
+        suspended_symbols = list([x[:6] for x in Utils.tsp.suspend_d(
             suspend_type='S', trade_date=today)['ts_code'].to_list()])
         with open(Utils.SUSPENDED_SYMBOLS_FILE, "w") as f:
             f.write(json.dumps(suspended_symbols))
 
     @staticmethod
     def is_closed_day(day=None):
+        
+        if Utils.tsp is None:
+            Utils.tsp = ts.pro_api()
+
         if day is None:
             day = time.strftime('%Y%m%d')
 
@@ -61,7 +68,7 @@ class Utils:
         if Utils.rd.get(key):
             return False if Utils.rd.get(key) == b'false' else True
 
-        df = tsp.trade_cal(exchange='SSE', start_date=day, end_date=day)
+        df = Utils.tsp.trade_cal(exchange='SSE', start_date=day, end_date=day)
         if df.iloc[0]['is_open'] == 1:
             Utils.rd.set(key, 'false')
             return False
@@ -71,16 +78,19 @@ class Utils:
 
     @staticmethod
     def get_pretrade_date(day=None):
+        if Utils.tsp is None:
+            Utils.tsp = ts.pro_api()
+
         if day is None:
             day = time.strftime('%Y%m%d')
-        df = tsp.trade_cal(exchange='SSE', start_date=day, end_date=day,
+        df = Utils.tsp.trade_cal(exchange='SSE', start_date=day, end_date=day,
                            fields="exchange,cal_date,is_open,pretrade_date")
         return df.at[0, 'pretrade_date']
 
     @staticmethod
     def get_last_trade_date():
         day = time.strftime('%Y%m%d')
-        df = tsp.trade_cal(exchange='SSE', start_date=day, end_date=day,
+        df = Utils.tsp.trade_cal(exchange='SSE', start_date=day, end_date=day,
                            fields="exchange,cal_date,is_open,pretrade_date")
         if df.iloc[0]['is_open'] == 1:
             return day
