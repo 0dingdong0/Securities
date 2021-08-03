@@ -137,7 +137,7 @@ def assist(assist_idx, assist_count):
                 print(
                     f'Assist[{assist_idx}]: sharedmemory is going to be closed')
                 for date in data:
-                    data[date].close_sharedmemory()
+                    data[date][0].close_sharedmemory()
                 break
 
             else:
