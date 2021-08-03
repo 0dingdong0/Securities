@@ -7,13 +7,15 @@ import tushare as ts
 ts.set_token('aecca28adc0d5a7764b748ccd48bef923d81314ae47b4d44d51fce67')
 # tsp = ts.pro_api()
 
+
 class Utils:
 
     rd = redis.Redis(host='127.0.0.1', port=6379, db=8)
     SYMBOLS_FILE = os.path.join(os.getcwd(), "symbols.json")
     SUSPENDED_SYMBOLS_FILE = os.path.join(
         os.getcwd(), "suspended_symbols.json")
-        
+    tsp = None
+
     @staticmethod
     def get_symbols():
         if not os.path.exists(Utils.SYMBOLS_FILE):
@@ -56,7 +58,7 @@ class Utils:
 
     @staticmethod
     def is_closed_day(day=None):
-        
+
         if Utils.tsp is None:
             Utils.tsp = ts.pro_api()
 
@@ -84,14 +86,14 @@ class Utils:
         if day is None:
             day = time.strftime('%Y%m%d')
         df = Utils.tsp.trade_cal(exchange='SSE', start_date=day, end_date=day,
-                           fields="exchange,cal_date,is_open,pretrade_date")
+                                 fields="exchange,cal_date,is_open,pretrade_date")
         return df.at[0, 'pretrade_date']
 
     @staticmethod
     def get_last_trade_date():
         day = time.strftime('%Y%m%d')
         df = Utils.tsp.trade_cal(exchange='SSE', start_date=day, end_date=day,
-                           fields="exchange,cal_date,is_open,pretrade_date")
+                                 fields="exchange,cal_date,is_open,pretrade_date")
         if df.iloc[0]['is_open'] == 1:
             return day
         else:
