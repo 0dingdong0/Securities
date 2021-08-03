@@ -104,28 +104,34 @@ async def set_user_id(request, response):
 
 async def get_dailydata(date):
     if date not in app.ctx.data:
-        file = os.path.join(os.getcwd(), 'storage', f'{date}.hdf5')
-        if os.path.exists(file):
-            app.ctx.data[date] = DailyData.load(dt=date)
-            if not (await app.ctx.ar.get('hq_assist_count')):
-                assist_count = math.ceil(
-                    len(app.ctx.data[date].symbols)/800)+1
-                await app.ctx.ar.set('hq_assist_count', assist_count)
-            assist_count = await app.ctx.ar.get('hq_assist_count')
+        try:
+            app.ctx.data[date] = DailyData(date)
+            add_snapshot_handler(snapshot_handler)
+            asyncio.create_task(start_snapshot_listening())
+        except FileNotFoundError:
+            file = os.path.join(os.getcwd(), 'storage', f'{date}.hdf5')
+            if os.path.exists(file):
+                app.ctx.data[date] = DailyData.load(dt=date)
+                if not (await app.ctx.ar.get('hq_assist_count')):
+                    assist_count = math.ceil(
+                        len(app.ctx.data[date].symbols)/800)+1
+                    await app.ctx.ar.set('hq_assist_count', assist_count)
+                assist_count = await app.ctx.ar.get('hq_assist_count')
 
-            msg = {
-                'command': 'compute_statistics',
-                'date': date
-            }
-            await asyncio.gather(
-                *[app.ctx.ar.lpush(f'hq_assist_{_}', json.dumps(msg)) for _ in range(assist_count)]
-            )
-            results = await asyncio.gather(*[app.ctx.ar.brpop(f'hq_assist_{_}_compute_statistics') for _ in range(assist_count)])
-            if not all([json.loads(result[1].decode("utf-8"))['status'] == 'success' for result in results]):
-                raise exceptions.ServerError(
-                    f"Failed to calculate statistics for dailydata at ({date})")
-        else:
-            raise exceptions.NotFound(f"Could not find dailydata at ({date})")
+                msg = {
+                    'command': 'compute_statistics',
+                    'date': date
+                }
+                await asyncio.gather(
+                    *[app.ctx.ar.lpush(f'hq_assist_{_}', json.dumps(msg)) for _ in range(assist_count)]
+                )
+                results = await asyncio.gather(*[app.ctx.ar.brpop(f'hq_assist_{_}_compute_statistics') for _ in range(assist_count)])
+                if not all([json.loads(result[1].decode("utf-8"))['status'] == 'success' for result in results]):
+                    raise exceptions.ServerError(
+                        f"Failed to calculate statistics for dailydata at ({date})")
+            else:
+                raise exceptions.NotFound(
+                    f"Could not find dailydata at ({date})")
 
     return app.ctx.data[date]
 
