@@ -150,7 +150,6 @@ def assist(assist_idx, assist_count):
 
 
 async def start_snapshot_listening(date=time.strftime('%Y%m%d')):
-
     check_points_length = int(rd.get(f'hq_{date}_check_points_length'))
     assist_count = int(rd.get('hq_assist_count'))
 
@@ -165,6 +164,7 @@ async def start_snapshot_listening(date=time.strftime('%Y%m%d')):
         check_point_idx = int(data['idx'])
         status[check_point_idx] += 1
 
+        # print(len(snapshot_handlers), status[check_point_idx], assist_count)
         if status[check_point_idx] == assist_count:
             for handler in snapshot_handlers:
                 if asyncio.iscoroutinefunction(handler):

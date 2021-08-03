@@ -42,6 +42,7 @@ app.ctx.queues = {}
 
 
 async def snapshot_handler(results):
+    
     if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
         # todo: notify updates
         check_point_idx = int(results[0]['idx'])
@@ -107,7 +108,8 @@ async def get_dailydata(date):
         try:
             app.ctx.data[date] = DailyData(date)
             add_snapshot_handler(snapshot_handler)
-            asyncio.create_task(start_snapshot_listening())
+            asyncio.create_task(start_snapshot_listening(date=date))
+            print('add snapshotting handler')
         except FileNotFoundError:
             file = os.path.join(os.getcwd(), 'storage', f'{date}.hdf5')
             if os.path.exists(file):
@@ -146,7 +148,7 @@ async def market(request, date):
     else:
         timestamp = time.time()
 
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
+    # print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
 
     result = {'date': date, 'timestamp': timestamp,
               'request_id': str(request.id)}
