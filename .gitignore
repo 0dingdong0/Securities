@@ -1,12 +1,15 @@
 .vscode
 
-# Python:
+# Python files:
 *.c
 *.py[cod]
 *.so
 *.egg
 *.egg-info
-__pycache__
-dist
-build
-storage
+
+# Python folders:
+__pycache__/
+dist/
+build/
+storage/
+notebooks/.ipynb_checkpoints/
