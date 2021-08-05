@@ -40,12 +40,14 @@ app.ctx.data = {}
 # { request.ctx.user_id => { ws_client_id => queue } }
 app.ctx.queues = {}
 
+app.ctx.last_check_points_index = None
 
 async def snapshot_handler(results):
     
     if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
         # todo: notify updates
         check_point_idx = int(results[0]['idx'])
+        app.ctx.last_check_points_index = check_point_idx
         print('snapshotting', check_point_idx)
 
         await asyncio.gather(*[queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues], [])])
@@ -145,10 +147,12 @@ async def market(request, date):
 
     if "timestamp" in request.args:
         timestamp = float(request.args.get("timestamp"))
+    elif app.ctx.last_check_points_index:
+        timestamp = int(dailydata.check_points[app.ctx.last_check_points_index])
     else:
         timestamp = time.time()
 
-    # print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
 
     result = {'date': date, 'timestamp': timestamp,
               'request_id': str(request.id)}
