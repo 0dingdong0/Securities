@@ -1,4 +1,40 @@
 body {
+    margin: 0px;
     box-sizing: border-box;
     background-color: lightgray;
+}
+
+
+div#zhangting-panel{
+    position:relative;
+    width: 100%;
+    height: 500px;
+}
+
+div#zhishu{
+    position:relative;
+    background-color: gray;
+    width: 90px;
+    height:100%;
+}
+
+div#zhangting{
+    background-color: black;
+    position: absolute;
+    top:0px;
+    bottom:0px;
+    left:90px;
+    right:0px;
+}
+
+div#zhangting .stocks{
+    position: absolute;
+    top:0px;
+    left:0px;
+    right:0px;
+    bottom:0px;
+}
+
+div#zhangting .stocks span.stock{
+    position:absolute;
 }
