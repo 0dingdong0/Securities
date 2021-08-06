@@ -92,7 +92,7 @@ class TDX:
 
                 stock_code = stock_code.strip()
 
-                if tdxhy_code != 'T00':
+                if tdxhy_code and tdxhy_code != 'T00':
                     result[tdxhy_code]['codes'].append(stock_code)
         return result
 
