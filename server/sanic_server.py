@@ -42,8 +42,9 @@ app.ctx.queues = {}
 
 app.ctx.last_check_points_index = None
 
+
 async def snapshot_handler(results):
-    
+
     if all([result['status'] == 'successful'] and result['idx'] == results[0]['idx'] for result in results):
         # todo: notify updates
         check_point_idx = int(results[0]['idx'])
@@ -148,7 +149,8 @@ async def market(request, date):
     if "timestamp" in request.args:
         timestamp = float(request.args.get("timestamp"))
     elif app.ctx.last_check_points_index:
-        timestamp = int(dailydata.check_points[app.ctx.last_check_points_index])
+        timestamp = int(
+            dailydata.check_points[app.ctx.last_check_points_index])
     else:
         timestamp = time.time()
 
@@ -190,7 +192,8 @@ async def market(request, date):
             (
                 int(idx[0]),
                 int(dailydata.check_points[np.argmax(
-                    dailydata.statistic[:check_point_idx+1, idx[0], 4] > 0)])
+                    dailydata.statistic[:check_point_idx+1, idx[0], 4] > 0)]),
+                dailydata.statistic[check_point_idx, idx[0], 4]
             ) for idx in np.argwhere(dailydata.statistic[check_point_idx, :, 4] > 0)
         ])
 

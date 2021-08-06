@@ -8,14 +8,33 @@ body {
 div#zhangting-panel{
     position:relative;
     width: 100%;
-    height: 500px;
+    height: 700px;
+}
+
+div#zhangting-panel>div{
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+div#zhangting-panel>div::-webkit-scrollbar{
+    display: none;
 }
 
 div#zhishu{
     position:relative;
-    background-color: gray;
-    width: 90px;
+    background-color: black;
+    color:white;
+    width: 120px;
     height:100%;
+}
+
+div#zhishu ul{
+    list-style-type: none;
+    padding:5px;
+    margin:0px;
+}
+div#zhishu ul li span:last-child{
+    position: absolute;
+    right: 5px;
 }
 
 div#zhangting{
@@ -23,7 +42,7 @@ div#zhangting{
     position: absolute;
     top:0px;
     bottom:0px;
-    left:90px;
+    left:120px;
     right:0px;
 }
 
@@ -35,6 +54,12 @@ div#zhangting .stocks{
     bottom:0px;
 }
 
-div#zhangting .stocks span.stock{
+div#zhangting .stocks span{
     position:absolute;
+    color:white;
+}
+
+
+div#zhangting .stocks span.lanban{
+    color:grey;
 }
