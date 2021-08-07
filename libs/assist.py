@@ -77,7 +77,7 @@ def assist(assist_idx, assist_count):
                     compute_stats(snapshot, basics,
                                   statistic, fs5p, time_lapse)
 
-                    await ar.publish(f'hq_assist_{assist_idx}_snapshotting', json.dumps({"status": 'successful', "idx": _, 'check_point': int(check_point)}))
+                    await ar.publish(f'hq_assist_{assist_idx}_snapshotting', json.dumps({"status": 'successful', "date": date, "idx": _, 'check_point': int(check_point)}))
 
                 except Exception as e:
                     error = {

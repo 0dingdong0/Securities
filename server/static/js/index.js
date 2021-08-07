@@ -19,10 +19,11 @@
 
 
 const data = {}
+let socket = undefined
 
 window.onload = function () {
-    let date = moment().format('YYYYMMDD')
-    // let date = '20210712'
+    // let date = moment().format('YYYYMMDD')
+    let date = '20210712'
 
     let timestamp = moment().unix()
     let init = true
@@ -38,24 +39,51 @@ window.onload = function () {
 
     axios.get(`/market/${date}`, { 'params': params })
         .then((response) => {
+            socket = new WebSocket(`ws://127.0.0.1:8000/websocket/${moment().format('x')}`)
+            socket.onopen = function (event) {
+                socket.send("Hello!");
+            };
+            socket.onmessage = function (event) {
+                let result = JSON.parse(event.data)
+                if(result.cmd == 'snapshot'){
+                    if(!(result.date in data)){
+                        return
+                    }
+                    let dailydata = data[result.date]
+                    result.zt_status = result.zt_status.filter(
+                        item => !dailydata.names[item[0]].includes('ST')
+                    )
+                    result.zt_status.sort((a, b) => a[1] ? a[1] - b[1] : -1)
+                    
+                    zhangting.add_symbols(result.zt_status, result.check_point_idx)
+                }
+
+                console.log(result);
+            };
+            socket.onclose = function (event) {
+                console.log('closed')
+            };
+            socket.onerror = function (e) { console.log(e) }
+
             console.log('-----------------------')
             console.log(response)
             let result = response.data
             if (!(result.date in data)) {
                 data[result.date] = {
+                    'check_points': result.check_points,
                     'names': result.names,
                     'symbols': result.symbols,
                     'zhishu': result.zhishu,
                     'symbol_zhishu': {},
-                    'zt_indices': result.zt_indices.filter(
-                        idx => !result.names[idx].includes('ST')
-                    ),
-                    'zt_status': result.zt_status.filter(
-                        item => !result.names[item[0]].includes('ST')
-                    )
+                    // 'zt_indices': result.zt_indices.filter(
+                    //     idx => !result.names[idx].includes('ST')
+                    // ),
                 }
-
-                data[result.date].zt_status.sort((a, b) => a[1] - b[1])
+                
+                let zt_status = result.zt_status.filter(
+                    item => !result.names[item[0]].includes('ST')
+                )
+                zt_status.sort((a, b) => a[1] - b[1])
 
                 for (let symbol_zs in result.zhishu) {
                     let name_zs = result.zhishu[symbol_zs].name
@@ -67,9 +95,9 @@ window.onload = function () {
                     }
 
                 }
+                zhangting.add_symbols(zt_status, result.check_point_idx)
             }
             console.log(data)
-            zhangting.add_symbols(data[result.date].zt_status)
         }).catch((error) => {
             console.log(error)
         })
@@ -83,6 +111,7 @@ class Zhangting {
         this.date = date
         this.status = [left_margin]
         this.stocks = []
+        this.indices = []
         this.zhishu = {}
 
         this.left_margin = left_margin
@@ -128,52 +157,61 @@ class Zhangting {
             .style('stroke-width', 0.5)
     }
 
-    add_symbols(zt_status) {
+    add_symbols(zt_status, check_point_idx) {
+        let start = moment()
         let dd = data[this.date]
         let timestamp_093000 = moment(`${this.date} 09:30:00`, 'YYYYMMDD hh:mm:ss').unix()
 
         let y_max = this.top_margin
+        this.zhishu = {}
         for (let [symbol_idx, timestamp, not_lanban] of zt_status) {
 
-            let xd = timestamp - timestamp_093000
-            if (xd < 0) {
-                xd = 0
-            } else if (xd > 7200 && xd < 7500) {
-                xd = 7200
-            } else if (xd >= 12300 && xd < 12600) {
-                xd = 12600
-            } else if (xd >= 12600 && xd <= 19800) {
-                xd = xd - 5400
-            } else if (xd > 19800) {
-                xd = 14400
-            }
-
-            let x = this.xscale(xd)
-            let y = undefined
-            for (let yd = 0; yd < this.status.length; yd++) {
-                if (x >= this.status[yd]) {
-                    y = this.yscale(yd)
-                    this.status[yd] = x + 70
-                    break
-                }
-            }
-
-            // if (symbol_idx == 3708) {
-            //     console.log(timestamp, timestamp_093000, timestamp - timestamp_093000, xd, x)
-            // }
-
-            if (!y) {
-                this.status.push(this.left_margin + 70)
-                y = this.yscale(this.status.length - 1)
-                if (y > y_max) {
-                    y_max = y
-                }
-            }
-
             let symbol = dd.symbols[symbol_idx]
+            let _ = this.indices.indexOf(symbol_idx)
 
-            this.stocks.push([x, y, symbol, dd.names[symbol_idx], timestamp, not_lanban === 1])
-            // console.log(x, y, symbol_idx, dd.symbols[symbol_idx], dd.names[symbol_idx], timestamp, moment.unix(timestamp).format())
+            if( _ !== -1 ){
+                this.stocks[_][5] = not_lanban === 1
+            }else{
+                if(!timestamp){
+                    timestamp = dd.check_points[check_point_idx-1]
+                }
+
+                let xd = timestamp - timestamp_093000
+                if (xd < 0) {
+                    xd = 0
+                } else if (xd > 7200 && xd < 7500) {
+                    xd = 7200
+                } else if (xd >= 12300 && xd < 12600) {
+                    xd = 12600
+                } else if (xd >= 12600 && xd <= 19800) {
+                    xd = xd - 5400
+                } else if (xd > 19800) {
+                    xd = 14400
+                }
+    
+                let x = this.xscale(xd)
+                let y = undefined
+                for (let yd = 0; yd < this.status.length; yd++) {
+                    if (x >= this.status[yd]) {
+                        y = this.yscale(yd)
+                        this.status[yd] = x + 70
+                        break
+                    }
+                }
+    
+                if (!y) {
+                    this.status.push(this.left_margin + 70)
+                    y = this.yscale(this.status.length - 1)
+                    if (y > y_max) {
+                        y_max = y
+                    }
+                }
+    
+                this.stocks.push([x, y, symbol, dd.names[symbol_idx], timestamp, not_lanban === 1])
+                this.indices.push(symbol_idx)
+                // console.log(x, y, symbol_idx, dd.symbols[symbol_idx], dd.names[symbol_idx], timestamp, moment.unix(timestamp).format())
+    
+            }
 
             for (let [symbol_zhishu, name_zhishu] of dd.symbol_zhishu[symbol]) {
                 if (!(symbol_zhishu in this.zhishu)) {
@@ -209,6 +247,8 @@ class Zhangting {
             .join('li')
             .attr('class', d => d.symbol)
             .html(d => `<span>${d.name}</span><span>${d.count - d.count_lanban}/${d.count}</span>`)
+
+        console.log('Zhangting.add_symbols() used time:', moment()-start)
     }
 
 }

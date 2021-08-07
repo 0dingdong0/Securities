@@ -49,9 +49,9 @@ async def snapshot_handler(results):
         # todo: notify updates
         check_point_idx = int(results[0]['idx'])
         app.ctx.last_check_points_index = check_point_idx
-        print('snapshotting', check_point_idx)
+        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} snapshotting', check_point_idx, results[0])
 
-        await asyncio.gather(*[queue.put({'cmd': 'snapshot', 'idx': check_point_idx}) for queue in sum([list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues], [])])
+        await asyncio.gather(*[queue.put({'cmd': 'snapshot','idx': check_point_idx, 'date':results[0]['date']}) for queue in sum([list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues], [])])
         # pass
     else:
         print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
@@ -144,6 +144,8 @@ async def get_dailydata(date):
 @app.get("/market/<date:\d{8}>")
 async def market(request, date):
 
+    start = time.time()
+
     dailydata = await get_dailydata(date)
 
     if "timestamp" in request.args:
@@ -156,7 +158,7 @@ async def market(request, date):
 
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
 
-    result = {'date': date, 'timestamp': timestamp,
+    result = {'date': date, 'timestamp': timestamp, 'check_points': dailydata.check_points.tolist(),
               'request_id': str(request.id)}
     # result = {'date': date, 'timestamp': timestamp}
 
@@ -167,10 +169,12 @@ async def market(request, date):
     else:
         check_point_idx = np.argmax(dailydata.check_points > timestamp) - 1
 
+    result['check_point_idx'] = int(check_point_idx)
+
     result['zs_indices'] = np.argsort(
         dailydata.statistic[check_point_idx, :, 3]).tolist()
-    result['zt_indices'] = np.argwhere(
-        dailydata.statistic[check_point_idx, :, 4] > 0).tolist()
+    # result['zt_indices'] = np.argwhere(
+    #     dailydata.statistic[check_point_idx, :, 4] > 0).flatten().tolist()
     result['zf_indices'] = np.argsort(
         dailydata.statistic[check_point_idx, :, 0]).tolist()
     result['lb_indices'] = np.argsort(
@@ -197,6 +201,7 @@ async def market(request, date):
             ) for idx in np.argwhere(dailydata.statistic[check_point_idx, :, 4] > 0)
         ])
 
+    print('market ================>>>', time.time()-start)
     return response.json(result)
 
 
@@ -249,12 +254,44 @@ async def websocket(request, ws, ws_client_id):
                 else:
                     tasks.append(asyncio.create_task(
                         queue.get(), name='queue.get()'))
-                    asyncio.create_task(ws.send(str(result['idx'])))
+                    
+                    if result['cmd'] == 'snapshot':
+                        start = time.time()
+                        dailydata = await get_dailydata(result['date'])
+
+                        check_point_idx = result['idx']
+                        del result['idx']
+
+                        result['check_point_idx'] = check_point_idx
+
+                        result['zs_indices'] = np.argsort(
+                            dailydata.statistic[check_point_idx, :, 3]).tolist()
+                        result['zf_indices'] = np.argsort(
+                            dailydata.statistic[check_point_idx, :, 0]).tolist()
+                        result['lb_indices'] = np.argsort(
+                            dailydata.statistic[check_point_idx, :, 2]).tolist()
+
+                        # result['zt_indices'] = np.argwhere(dailydata.statistic[check_point_idx, :, 4] > 0).tolist()
+                        not_zhangting = dailydata.statistic[check_point_idx-1, :, 4] <= 0
+                        zhangting = dailydata.statistic[check_point_idx, :, 4] > 0
+                        
+                        result['zt_status'] = list([
+                            (
+                                int(idx[0]),
+                                int(dailydata.check_points[np.argmax(
+                                    dailydata.statistic[:check_point_idx+1, idx[0], 4] > 0)]) if not_zhangting[idx[0]] else None,
+                                dailydata.statistic[check_point_idx, idx[0], 4]
+                            ) for idx in np.argwhere(zhangting)
+                        ])
+
+                        print('websocket ===============>>>', time.time()-start, np.argwhere(not_zhangting == zhangting))
+                        asyncio.create_task(ws.send(json.dumps(result)))
 
             # break
     except Exception as e:
         print(str(e))
         traceback.print_exc()
+
     finally:
         # remove queue from app.ctx.queues
         del app.ctx.queues[request.ctx.user_id][ws_client_id]
@@ -262,6 +299,8 @@ async def websocket(request, ws, ws_client_id):
         for task in tasks:
             if not task.done():
                 task.cancel()
+            else:
+                task.exception()
 
 
 if __name__ == "__main__":
