@@ -180,6 +180,11 @@ async def market(request, date):
     result['lb_indices'] = np.argsort(
         dailydata.statistic[check_point_idx, :, 2]).tolist()
 
+    result['snapshot'] = dailydata.snapshots[check_point_idx].tolist()
+    result['zhangsu'] = dailydata.statistic[check_point_idx,:,3].tolist()
+    result['zhangfu'] = dailydata.statistic[check_point_idx,:,0].tolist()
+    result['liangbi'] = dailydata.statistic[check_point_idx,:,2].tolist()
+
     init = request.args.get("init")
     if init:
         file = 'storage//'+date+'_zhishu.json'
@@ -192,6 +197,7 @@ async def market(request, date):
 
         result['symbols'] = dailydata.symbols.tolist()
         result['names'] = dailydata.names.tolist()
+        result['mcap'] = dailydata.basics[:, 3].tolist()
         result['zt_status'] = list([
             (
                 int(idx[0]),
@@ -270,6 +276,11 @@ async def websocket(request, ws, ws_client_id):
                             dailydata.statistic[check_point_idx, :, 0]).tolist()
                         result['lb_indices'] = np.argsort(
                             dailydata.statistic[check_point_idx, :, 2]).tolist()
+
+                        result['snapshot'] = dailydata.snapshots[check_point_idx].tolist()
+                        result['zhangsu'] = dailydata.statistic[check_point_idx,:,3].tolist()
+                        result['zhangfu'] = dailydata.statistic[check_point_idx,:,0].tolist()
+                        result['liangbi'] = dailydata.statistic[check_point_idx,:,2].tolist()
 
                         # result['zt_indices'] = np.argwhere(dailydata.statistic[check_point_idx, :, 4] > 0).tolist()
                         not_zhangting = dailydata.statistic[check_point_idx-1, :, 4] <= 0

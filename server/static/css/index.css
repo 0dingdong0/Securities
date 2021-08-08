@@ -1,22 +1,31 @@
 body {
     margin: 0px;
     box-sizing: border-box;
+    color: white;
     background-color: lightgray;
 }
 
+body>div{
+    position:relative !important;
+}
 
 div#zhangting-panel{
-    position:relative;
     width: 100%;
     height: 700px;
 }
 
-div#zhangting-panel>div{
+.container{
     overflow-y: scroll;
     overflow-x: hidden;
 }
-div#zhangting-panel>div::-webkit-scrollbar{
+.container::-webkit-scrollbar{
     display: none;
+}
+
+div#stock-lists{
+    /* position:relative;
+    background-color: lightblue; */
+    /* height:300px; */
 }
 
 div#zhishu{
@@ -27,15 +36,33 @@ div#zhishu{
     height:100%;
 }
 
-div#zhishu ul{
+table{
+    width:100%;
+}
+
+td{
+    text-align: right;
+    padding: 0px 1px;
+}
+
+td.symbol, td.name{
+    text-align: left;
+}
+/* 
+.container>ul{
     list-style-type: none;
     padding:5px;
     margin:0px;
 }
-div#zhishu ul li span:last-child{
+
+.container>ul li{
+    position: relative;
+}
+
+.container>ul li span:last-child{
     position: absolute;
     right: 5px;
-}
+} */
 
 div#zhangting{
     background-color: black;
@@ -56,10 +83,47 @@ div#zhangting .stocks{
 
 div#zhangting .stocks span{
     position:absolute;
-    color:white;
 }
 
 
 div#zhangting .stocks span.lanban{
     color:grey;
+}
+
+div#zhangsu{
+    position: relative;
+    width:330px;
+    height:100%;
+    background-color: black;
+}
+
+div#zhangsu-zhishu{
+    width:100px;
+    height: 100%;
+}
+
+div#zhangsu-stocks{
+    position:absolute;
+    top:0px;
+    bottom:0px;
+    left:100px;
+    right:0px;
+    /* width:170px;
+    height: 100%; */
+}
+
+div#zhishu-list{
+    position: absolute;
+    top:0px;
+    bottom:0px;
+    left:330px;
+    width:80px;
+}
+div#stock-list{
+    position: absolute;
+    top:0px;
+    bottom:0px;
+    left:410px;
+    width:320px;
+    background-color: black;
 }

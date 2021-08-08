@@ -22,6 +22,8 @@ const data = {}
 let socket = undefined
 
 window.onload = function () {
+    update_ui_size()
+    window.onresize = update_ui_size
     // let date = moment().format('YYYYMMDD')
     let date = '20210712'
 
@@ -36,15 +38,20 @@ window.onload = function () {
     }
 
     let zhangting = new Zhangting(date, '#zhangting')
+    let zhangsu = new Zhangsu(date, '#zhangsu')
+    let stocks = new Stocks(date, '#stock-list')
 
     axios.get(`/market/${date}`, { 'params': params })
         .then((response) => {
+
             socket = new WebSocket(`ws://127.0.0.1:8000/websocket/${moment().format('x')}`)
             socket.onopen = function (event) {
                 socket.send("Hello!");
             };
             socket.onmessage = function (event) {
-                let result = JSON.parse(event.data)
+                // console.log(event.data);
+                // let result = JSON.parse(event.data)
+                let result = eval(`(${event.data})`)
                 if(result.cmd == 'snapshot'){
                     if(!(result.date in data)){
                         return
@@ -54,8 +61,18 @@ window.onload = function () {
                         item => !dailydata.names[item[0]].includes('ST')
                     )
                     result.zt_status.sort((a, b) => a[1] ? a[1] - b[1] : -1)
+
+                    dailydata['zf_indices'] = result.zf_indices
+                    dailydata['zhangfu'] = result.zhangfu
+                    dailydata['zs_indices'] = result.zs_indices
+                    dailydata['zhangsu'] = result.zhangsu
+                    dailydata['lb_indices'] = result.lb_indices
+                    dailydata['liangbi'] = result.liangbi
+                    dailydata['snapshot'] = result.snapshot
                     
                     zhangting.add_symbols(result.zt_status, result.check_point_idx)
+                    zhangsu.update()
+                    stocks.update()
                 }
 
                 console.log(result);
@@ -65,19 +82,30 @@ window.onload = function () {
             };
             socket.onerror = function (e) { console.log(e) }
 
-            console.log('-----------------------')
-            console.log(response)
+            console.log('-----------------------', response)
+
             let result = response.data
+            if(typeof(result) === 'string'){
+                result = eval(`(${result})`)
+            }
             if (!(result.date in data)) {
                 data[result.date] = {
                     'check_points': result.check_points,
                     'names': result.names,
                     'symbols': result.symbols,
+                    'mcap': result.mcap,
                     'zhishu': result.zhishu,
                     'symbol_zhishu': {},
                     // 'zt_indices': result.zt_indices.filter(
                     //     idx => !result.names[idx].includes('ST')
                     // ),
+                    'zf_indices': result.zf_indices,
+                    'zs_indices': result.zs_indices,
+                    'lb_indices': result.lb_indices,
+                    'zhangfu': result.zhangfu,
+                    'zhangsu': result.zhangsu,
+                    'liangbi': result.liangbi,
+                    'snapshot': result.snapshot
                 }
                 
                 let zt_status = result.zt_status.filter(
@@ -96,12 +124,98 @@ window.onload = function () {
 
                 }
                 zhangting.add_symbols(zt_status, result.check_point_idx)
+                zhangsu.update()
+                stocks.update()
             }
+            
             console.log(data)
         }).catch((error) => {
             console.log(error)
         })
 
+}
+
+class Stocks {
+    constructor(date, container_selector){
+        this.date = date
+        this.sort_column = 'zhangfu'
+        this.ascending = false
+        this.stocks = d3.select(`${container_selector} tbody`)
+    }
+
+    update(){
+        let dd = data[this.date]
+        let data_stocks = []
+
+        let indices = undefined
+        if(this.sort_column == 'zhangfu'){
+            indices = dd.zf_indices
+        }else if(this.sort_column == 'liangbi'){
+            indices = dd.lb_indices
+        }
+        
+        if(!this.ascending){
+            indices = indices.slice().reverse()
+        }
+
+        for(let _ of indices.slice(0,100)){
+            let symbol = dd.symbols[_]
+            let name = dd.names[_]
+            let zhangfu = dd.zhangfu[_].toFixed(2)
+            let liangbi = dd.liangbi[_].toFixed(1)
+            let now = dd.snapshot[_][2]
+            let mcap = dd.mcap[_]
+            data_stocks.push([symbol, name, now, zhangfu, liangbi, mcap])
+        }
+
+        this.stocks.selectAll('tr')
+            .data(data_stocks)
+            .join('tr')
+            .attr('class', d=>d[0])
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td ="now">${d[2]}</td><td class="zhangfu">${d[3]}</td><td class="liangbi">${d[4]}</td><td class="mcap">${d[5]}</td>`)
+    }
+}
+
+class Zhangsu {
+    constructor(date, container_selector){
+        this.date = date
+        this.zhishu = d3.select(`${container_selector} #zhangsu-zhishu tbody`)
+        this.stocks = d3.select(`${container_selector} #zhangsu-stocks tbody`)
+    }
+
+    update(){
+        let dd = data[this.date]
+
+        let data_stocks = []
+        let data_zhishu = {}
+        for(let _ of dd.zs_indices.slice(-37)){
+            let symbol = dd.symbols[_]
+            let name = dd.names[_]
+            let zhangfu = dd.zhangfu[_].toFixed(2)
+            let zhangsu = dd.zhangsu[_].toFixed(2)
+            data_stocks.unshift([symbol, name, zhangfu, zhangsu])
+            
+            for (let [symbol_zhishu, name_zhishu] of dd.symbol_zhishu[symbol]) {
+                if (!(symbol_zhishu in data_zhishu)) {
+                    data_zhishu[symbol_zhishu] = [symbol_zhishu, name_zhishu, 1 ]
+                } else {
+                    data_zhishu[symbol_zhishu][2]++
+                }
+            }
+        }
+        this.stocks.selectAll('tr')
+            .data(data_stocks)
+            .join('tr')
+            .attr('class', d=>d[0])
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td class="zhangfu"><td>${d[2]}</td><tdclass="zhangsu">${d[3]}</td>`)
+
+        this.zhishu.selectAll('tr')
+            .data(Object.values(data_zhishu).sort((a, b) => b[2] - a[2]))
+            .join('tr')
+            .attr('class', d => d[0])
+            .html(d => `<td class="name">${d[1]}</td><td class="double-count">${d[2]}</td>`)
+
+    }
 }
 
 class Zhangting {
@@ -120,6 +234,7 @@ class Zhangting {
         this.bottom_margin = bottom_margin
 
         this.div_parent = document.querySelector(parent_selector)
+        console.log(this.div_parent.clientHeight)
         this.svg = d3.select(parent_selector).select('svg')
         this.svg.attr('width', this.div_parent.clientWidth).attr('height', this.div_parent.clientHeight)
 
@@ -131,7 +246,7 @@ class Zhangting {
         let height = parseInt(this.svg.attr('height'))
 
         this.xscale = d3.scaleLinear().domain([0, 14400]).range([this.left_margin, width - this.right_margin])
-        this.yscale = d3.scaleLinear().domain([0, 100]).range([this.top_margin, this.top_margin + 2100])
+        this.yscale = d3.scaleLinear().domain([0, 100]).range([this.top_margin, this.top_margin + 2000])
 
         let count = 8
         let step = (width - this.left_margin - this.right_margin) / count
@@ -241,14 +356,21 @@ class Zhangting {
             .attr('style', d => `left:${d[0]}px;top:${d[1]}px;`)
             .text(d => d[3])
 
-        d3.select('#zhishu ul')
-            .selectAll('li')
+        d3.select('#zhishu tbody')
+            .selectAll('tr')
             .data(Object.values(this.zhishu).sort((a, b) => b.count - a.count))
-            .join('li')
+            .join('tr')
             .attr('class', d => d.symbol)
-            .html(d => `<span>${d.name}</span><span>${d.count - d.count_lanban}/${d.count}</span>`)
+            .html(d => `<td class="name">${d.name}</td><td class="double-count">${d.count - d.count_lanban}/${d.count}</td>`)
 
-        console.log('Zhangting.add_symbols() used time:', moment()-start)
+        console.log('Zhangting.add_symbols() used time:', moment()-start, 'ms')
     }
 
+}
+
+let update_ui_size = function(){
+    let width_zhangting_panel = document.querySelector('#zhangting-panel').clientWidth
+    let height_zhangting_panel = document.querySelector('#zhangting-panel').clientHeight
+    
+    document.querySelector('#stock-lists').setAttribute('style', `height:${window.innerHeight - height_zhangting_panel}px`)
 }
