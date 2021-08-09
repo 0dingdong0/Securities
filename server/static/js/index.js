@@ -25,7 +25,7 @@ window.onload = function () {
     update_ui_size()
     window.onresize = update_ui_size
     // let date = moment().format('YYYYMMDD')
-    let date = '20210712'
+    let date = '20210809'
 
     let timestamp = moment().unix()
     let init = true
@@ -141,6 +141,32 @@ class Stocks {
         this.sort_column = 'zhangfu'
         this.ascending = false
         this.stocks = d3.select(`${container_selector} tbody`)
+
+        let that = this
+        this.stocks.on('click', (e)=>{
+            if(e.target.tagName !== 'TD'){
+                return
+            }
+
+            let column = undefined
+            if(e.target.classList.contains('liangbi')){
+                column = 'liangbi'
+            }else if(e.target.classList.contains('zhangfu')){
+                column = 'zhangfu'
+            }
+
+            if(!column){
+                return
+            }
+
+            if(column === that.sort_column){
+                that.ascending = !that.ascending
+            }else{
+                that.sort_column = column
+            }
+
+            that.update()
+        })
     }
 
     update(){
@@ -172,7 +198,7 @@ class Stocks {
             .data(data_stocks)
             .join('tr')
             .attr('class', d=>d[0])
-            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td ="now">${d[2]}</td><td class="zhangfu">${d[3]}</td><td class="liangbi">${d[4]}</td><td class="mcap">${d[5]}</td>`)
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="now">${d[2]}</td><td class="zhangfu">${d[3]}</td><td class="liangbi">${d[4]}</td><td class="mcap">${d[5]}</td>`)
     }
 }
 
@@ -188,9 +214,16 @@ class Zhangsu {
 
         let data_stocks = []
         let data_zhishu = {}
-        for(let _ of dd.zs_indices.slice(-37)){
+        for(let _ of dd.zs_indices.slice(-30)){
             let symbol = dd.symbols[_]
             let name = dd.names[_]
+
+
+
+            if(dd.zhangsu[_]<2){
+                continue
+            }
+
             let zhangfu = dd.zhangfu[_].toFixed(2)
             let zhangsu = dd.zhangsu[_].toFixed(2)
             data_stocks.unshift([symbol, name, zhangfu, zhangsu])
@@ -207,13 +240,13 @@ class Zhangsu {
             .data(data_stocks)
             .join('tr')
             .attr('class', d=>d[0])
-            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td class="zhangfu"><td>${d[2]}</td><tdclass="zhangsu">${d[3]}</td>`)
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="zhangfu">${d[2]}</td><td class="zhangsu">${d[3]}</td>`)
 
         this.zhishu.selectAll('tr')
             .data(Object.values(data_zhishu).sort((a, b) => b[2] - a[2]))
             .join('tr')
             .attr('class', d => d[0])
-            .html(d => `<td class="name">${d[1]}</td><td class="double-count">${d[2]}</td>`)
+            .html(d => `<td class="name">${d[1]}</td><td class="count">${d[2]}</td>`)
 
     }
 }

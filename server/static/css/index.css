@@ -3,6 +3,7 @@ body {
     box-sizing: border-box;
     color: white;
     background-color: lightgray;
+    user-select: none;
 }
 
 body>div{
@@ -22,12 +23,6 @@ div#zhangting-panel{
     display: none;
 }
 
-div#stock-lists{
-    /* position:relative;
-    background-color: lightblue; */
-    /* height:300px; */
-}
-
 div#zhishu{
     position:relative;
     background-color: black;
@@ -35,7 +30,9 @@ div#zhishu{
     width: 120px;
     height:100%;
 }
-
+#zhangting span, td{
+    cursor:pointer;
+}
 table{
     width:100%;
 }
@@ -45,25 +42,21 @@ td{
     padding: 0px 1px;
 }
 
+td.zhangfu, td.zhangsu, td.liangbi, td.now, td.mcap{
+    width:45px;
+}
+
+td.name{
+    width:65px;
+}
+
+td.symbol{
+    width:50px;
+}
+
 td.symbol, td.name{
     text-align: left;
 }
-/* 
-.container>ul{
-    list-style-type: none;
-    padding:5px;
-    margin:0px;
-}
-
-.container>ul li{
-    position: relative;
-}
-
-.container>ul li span:last-child{
-    position: absolute;
-    right: 5px;
-} */
-
 div#zhangting{
     background-color: black;
     position: absolute;
@@ -108,8 +101,7 @@ div#zhangsu-stocks{
     bottom:0px;
     left:100px;
     right:0px;
-    /* width:170px;
-    height: 100%; */
+    padding-left: 5px;
 }
 
 div#zhishu-list{
@@ -117,13 +109,14 @@ div#zhishu-list{
     top:0px;
     bottom:0px;
     left:330px;
-    width:80px;
+    width:90px;
 }
 div#stock-list{
     position: absolute;
     top:0px;
     bottom:0px;
-    left:410px;
-    width:320px;
+    left:420px;
+    width:350px;
+    padding-left: 5px;
     background-color: black;
 }
