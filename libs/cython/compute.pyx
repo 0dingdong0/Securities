@@ -46,7 +46,7 @@ cpdef compute_stats(DTYPE_t[:,:] ms, DTYPE_t[:,:] b, DTYPE_t[:,:] st, DTYPE_t[:,
 
         if ms[i,idx_turnover]:
             st[i,idx_jj] = ms[i,idx_volume]/ms[i,idx_turnover]
-            st[i,idx_zs] = 100*(ms[i,idx_now]/fs5p[i, 0]-1)
+            st[i,idx_zs] = 100*(ms[i,idx_now]/fs5p[i, idx_now]-1)
             if fabs(ms[i,idx_high] - b[i,0]) < 0.001:
                 st[i,idx_tb] = 0.5
                 if fabs(ms[i,idx_high] - ms[i,idx_now]) < 0.001:
