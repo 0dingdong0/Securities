@@ -3,6 +3,7 @@ import math
 import time
 import uuid
 import json
+import redis
 import asyncio
 import traceback
 import numpy as np
@@ -31,6 +32,19 @@ app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
 app.static("/", "server/static/html/index.html")
 
+with open(os.path.join(os.getcwd(), 'config.json')) as file:
+    app.ctx.config = json.load(file)
+
+if 'redis' in app.ctx.config:
+    app.ctx.redis = redis.Redis(
+        host=app.ctx.config['redis']['host'],
+        port=app.ctx.config['redis']['port'],
+        db=app.ctx.config['redis']['db'],
+        password=app.ctx.config['redis']['password'],
+        decode_responses=True
+    )
+    # print(app.ctx.redis.get('tem'))
+
 
 app.ctx.ar = StrictRedis(host='127.0.0.1', port=6379, db=8)
 
@@ -49,9 +63,10 @@ async def snapshot_handler(results):
         # todo: notify updates
         check_point_idx = int(results[0]['idx'])
         app.ctx.last_check_points_index = check_point_idx
-        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} snapshotting', check_point_idx, results[0])
+        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} snapshotting',
+              check_point_idx, results[0])
 
-        await asyncio.gather(*[queue.put({'cmd': 'snapshot','idx': check_point_idx, 'date':results[0]['date']}) for queue in sum([list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues], [])])
+        await asyncio.gather(*[queue.put({'cmd': 'snapshot', 'idx': check_point_idx, 'date': results[0]['date']}) for queue in sum([list(app.ctx.queues[user_id].values()) for user_id in app.ctx.queues], [])])
         # pass
     else:
         print(f'\n{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}====================== abnormal snapchoting results ======================')
@@ -181,9 +196,9 @@ async def market(request, date):
         dailydata.statistic[check_point_idx, :, 2]).tolist()
 
     result['snapshot'] = dailydata.snapshots[check_point_idx].tolist()
-    result['zhangsu'] = dailydata.statistic[check_point_idx,:,3].tolist()
-    result['zhangfu'] = dailydata.statistic[check_point_idx,:,0].tolist()
-    result['liangbi'] = dailydata.statistic[check_point_idx,:,2].tolist()
+    result['zhangsu'] = dailydata.statistic[check_point_idx, :, 3].tolist()
+    result['zhangfu'] = dailydata.statistic[check_point_idx, :, 0].tolist()
+    result['liangbi'] = dailydata.statistic[check_point_idx, :, 2].tolist()
 
     init = request.args.get("init")
     if init:
@@ -260,7 +275,7 @@ async def websocket(request, ws, ws_client_id):
                 else:
                     tasks.append(asyncio.create_task(
                         queue.get(), name='queue.get()'))
-                    
+
                     if result['cmd'] == 'snapshot':
                         start = time.time()
                         dailydata = await get_dailydata(result['date'])
@@ -278,14 +293,17 @@ async def websocket(request, ws, ws_client_id):
                             dailydata.statistic[check_point_idx, :, 2]).tolist()
 
                         result['snapshot'] = dailydata.snapshots[check_point_idx].tolist()
-                        result['zhangsu'] = dailydata.statistic[check_point_idx,:,3].tolist()
-                        result['zhangfu'] = dailydata.statistic[check_point_idx,:,0].tolist()
-                        result['liangbi'] = dailydata.statistic[check_point_idx,:,2].tolist()
+                        result['zhangsu'] = dailydata.statistic[check_point_idx, :, 3].tolist(
+                        )
+                        result['zhangfu'] = dailydata.statistic[check_point_idx, :, 0].tolist(
+                        )
+                        result['liangbi'] = dailydata.statistic[check_point_idx, :, 2].tolist(
+                        )
 
                         # result['zt_indices'] = np.argwhere(dailydata.statistic[check_point_idx, :, 4] > 0).tolist()
                         not_zhangting = dailydata.statistic[check_point_idx-1, :, 4] <= 0
                         zhangting = dailydata.statistic[check_point_idx, :, 4] > 0
-                        
+
                         result['zt_status'] = list([
                             (
                                 int(idx[0]),
@@ -295,7 +313,8 @@ async def websocket(request, ws, ws_client_id):
                             ) for idx in np.argwhere(zhangting)
                         ])
 
-                        print('websocket ===============>>>', time.time()-start, np.argwhere(not_zhangting == zhangting))
+                        print('websocket ===============>>>', time.time() -
+                              start, np.argwhere(not_zhangting == zhangting))
                         asyncio.create_task(ws.send(json.dumps(result)))
 
             # break
