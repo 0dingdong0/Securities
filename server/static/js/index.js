@@ -17,15 +17,15 @@
 //     console.log('Message from server ', event.data);
 // });
 
-
+let date = '20210810'
 const data = {}
 let socket = undefined
+let selected_symbols = []
 
 window.onload = function () {
     update_ui_size()
     window.onresize = update_ui_size
     // let date = moment().format('YYYYMMDD')
-    let date = '20210809'
 
     let timestamp = moment().unix()
     let init = true
@@ -37,9 +37,9 @@ window.onload = function () {
         // 'timestamp' : 1626059575
     }
 
-    let zhangting = new Zhangting(date, '#zhangting')
-    let zhangsu = new Zhangsu(date, '#zhangsu')
-    let stocks = new Stocks(date, '#stock-list')
+    let zhangting = new Zhangting('#zhangting')
+    let zhangsu = new Zhangsu('#zhangsu')
+    let stocks = new Stocks('#stock-list')
 
     axios.get(`/market/${date}`, { 'params': params })
         .then((response) => {
@@ -73,6 +73,8 @@ window.onload = function () {
                     zhangting.add_symbols(result.zt_status, result.check_point_idx)
                     zhangsu.update()
                     stocks.update()
+
+                    keep_selection()
                 }
 
                 console.log(result);
@@ -89,6 +91,7 @@ window.onload = function () {
                 result = eval(`(${result})`)
             }
             if (!(result.date in data)) {
+                date = result.date
                 data[result.date] = {
                     'check_points': result.check_points,
                     'names': result.names,
@@ -123,9 +126,12 @@ window.onload = function () {
                     }
 
                 }
+
                 zhangting.add_symbols(zt_status, result.check_point_idx)
                 zhangsu.update()
                 stocks.update()
+
+                keep_selection()
             }
             
             console.log(data)
@@ -136,11 +142,12 @@ window.onload = function () {
 }
 
 class Stocks {
-    constructor(date, container_selector){
-        this.date = date
+    constructor(container_selector){
+        // this.date = date
         this.sort_column = 'zhangfu'
         this.ascending = false
         this.stocks = d3.select(`${container_selector} tbody`)
+        // this.symbols = []
 
         let that = this
         this.stocks.on('click', (e)=>{
@@ -170,7 +177,7 @@ class Stocks {
     }
 
     update(){
-        let dd = data[this.date]
+        let dd = data[date]
         let data_stocks = []
 
         let indices = undefined
@@ -184,7 +191,7 @@ class Stocks {
             indices = indices.slice().reverse()
         }
 
-        for(let _ of indices.slice(0,100)){
+        for(let _ of indices.slice(0,200)){
             let symbol = dd.symbols[_]
             let name = dd.names[_]
             let zhangfu = dd.zhangfu[_].toFixed(2)
@@ -197,20 +204,20 @@ class Stocks {
         this.stocks.selectAll('tr')
             .data(data_stocks)
             .join('tr')
-            .attr('class', d=>d[0])
+            .attr('class', d=>`_${d[0]}`)
             .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="now">${d[2]}</td><td class="zhangfu">${d[3]}</td><td class="liangbi">${d[4]}</td><td class="mcap">${d[5]}</td>`)
     }
 }
 
 class Zhangsu {
-    constructor(date, container_selector){
-        this.date = date
+    constructor(container_selector){
+        // this.date = date
         this.zhishu = d3.select(`${container_selector} #zhangsu-zhishu tbody`)
         this.stocks = d3.select(`${container_selector} #zhangsu-stocks tbody`)
     }
 
     update(){
-        let dd = data[this.date]
+        let dd = data[date]
 
         let data_stocks = []
         let data_zhishu = {}
@@ -239,13 +246,13 @@ class Zhangsu {
         this.stocks.selectAll('tr')
             .data(data_stocks)
             .join('tr')
-            .attr('class', d=>d[0])
+            .attr('class', d=>`_${d[0]}`)
             .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="zhangfu">${d[2]}</td><td class="zhangsu">${d[3]}</td>`)
 
         this.zhishu.selectAll('tr')
             .data(Object.values(data_zhishu).sort((a, b) => b[2] - a[2]))
             .join('tr')
-            .attr('class', d => d[0])
+            .attr('class', d=>`_${d[0]}`)
             .html(d => `<td class="name">${d[1]}</td><td class="count">${d[2]}</td>`)
 
     }
@@ -253,9 +260,9 @@ class Zhangsu {
 
 class Zhangting {
 
-    constructor(date, parent_selector, left_margin = 10, top_margin = 5, bottom_margin = 5, right_margin = 70) {
+    constructor(parent_selector, left_margin = 10, top_margin = 5, bottom_margin = 5, right_margin = 70) {
 
-        this.date = date
+        // this.date = date
         this.status = [left_margin]
         this.stocks = []
         this.indices = []
@@ -307,8 +314,8 @@ class Zhangting {
 
     add_symbols(zt_status, check_point_idx) {
         let start = moment()
-        let dd = data[this.date]
-        let timestamp_093000 = moment(`${this.date} 09:30:00`, 'YYYYMMDD hh:mm:ss').unix()
+        let dd = data[date]
+        let timestamp_093000 = moment(`${date} 09:30:00`, 'YYYYMMDD hh:mm:ss').unix()
 
         let y_max = this.top_margin
         this.zhishu = {}
@@ -385,7 +392,7 @@ class Zhangting {
             .selectAll('span')
             .data(this.stocks)
             .join('span')
-            .attr('class', d => d[5] ? d[2] : `${d[2]} lanban`)
+            .attr('class', d => d[5] ? `_${d[2]}` : `_${d[2]} lanban`)
             .attr('style', d => `left:${d[0]}px;top:${d[1]}px;`)
             .text(d => d[3])
 
@@ -393,7 +400,7 @@ class Zhangting {
             .selectAll('tr')
             .data(Object.values(this.zhishu).sort((a, b) => b.count - a.count))
             .join('tr')
-            .attr('class', d => d.symbol)
+            .attr('class', d => `_${d.symbol}`)
             .html(d => `<td class="name">${d.name}</td><td class="double-count">${d.count - d.count_lanban}/${d.count}</td>`)
 
         console.log('Zhangting.add_symbols() used time:', moment()-start, 'ms')
@@ -406,4 +413,128 @@ let update_ui_size = function(){
     let height_zhangting_panel = document.querySelector('#zhangting-panel').clientHeight
     
     document.querySelector('#stock-lists').setAttribute('style', `height:${window.innerHeight - height_zhangting_panel}px`)
+}
+
+d3.select('body').on('click', (e)=>{
+    let symbol = undefined
+    let el = undefined
+    if(e.target.tagName === "SPAN" && e.target.parentNode.parentNode.id == "zhangting"){
+        el = e.target
+    }else if(e.target.tagName === "TD"){
+        el = e.target.parentNode
+    }else if(e.target.tagName === "TR"){
+        el = e.target
+    }
+
+    if(!el){
+        return
+    }
+
+    for(let cls of el.classList){
+        if(/_\d\d\d\d\d\d/.test(`${cls}`)){
+            symbol = cls.slice(1)
+            break
+        }
+    }
+
+    if(!symbol){
+        return
+    }
+
+    let idx = selected_symbols.indexOf(symbol)
+    if(!e.shiftKey){
+        remove_class('selected')
+        if(idx===-1){
+            selected_symbols = [symbol]
+            add_class('selected', selected_symbols)
+        }else{
+            selected_symbols.splice(idx,1)
+        }
+    }else{
+        if(idx===-1){
+            selected_symbols.push(symbol)
+            add_class('selected', selected_symbols)
+        }else{
+            selected_symbols.splice(idx,1)
+            remove_class('selected', [symbol])
+        }
+    }
+
+    mark_relative()
+})
+
+function keep_selection(){
+    add_class('selected', selected_symbols)
+    mark_relative()
+}
+
+function mark_relative(){
+    remove_class('relative')
+    if(selected_symbols.length == 0){
+        return
+    }
+
+    let dd = data[date]
+    let symbols = undefined
+
+    for(let symbol of selected_symbols){
+
+        let _symbols = []
+        if(symbol.startsWith('8')){
+            _symbols = dd.zhishu[symbol].codes
+        }else{
+            _symbols = dd.symbol_zhishu[symbol].map(el=>el[0])
+        }
+
+        if(!symbols){
+            symbols = _symbols
+        }else{
+            symbols = symbols.filter(x=>_symbols.includes(x))
+        }
+
+        if(symbols.length == 0){
+            break
+        }
+    }
+
+    if(symbols.length){
+        add_class('relative', symbols)
+    }
+}
+
+function add_class(class_name, symbols=undefined){
+    let elements = []
+    if(symbols && symbols.length>0){
+        elements = document.querySelectorAll(symbols.map(e=>`._${e}`).join(','))
+    }else{
+        elements = document.querySelectorAll(`.${class_name}`)
+    }
+    
+    for(let el of elements){
+        el.classList.add(class_name)
+    }
+}
+function remove_class(class_name, symbols=undefined){
+    let elements = []
+    if(symbols && symbols.length>0){
+        elements = document.querySelectorAll(symbols.map(e=>`._${e}`).join(','))
+    }else{
+        elements = document.querySelectorAll(`.${class_name}`)
+    }
+    
+    for(let el of elements){
+        el.classList.remove(class_name)
+    }
+}
+function toggle_class(class_name, symbols=undefined){
+    let elements = []
+    if(symbols && symbols.length>0){
+        elements = document.querySelectorAll(symbols.map(e=>`._${e}`).join(','))
+    }else{
+        elements = document.querySelectorAll(`.${class_name}`)
+    }
+    
+    for(let el of elements){
+        el.classList.toggle(class_name)
+    }
 }
