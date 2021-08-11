@@ -135,6 +135,12 @@ tbody tr.selected{
     color: black;
     background-color: lightblue;
 }
+
+#stock-list .relative{
+    color: white;
+    background-color: black;
+}
+
 span.relative.lanban{
     color: grey;
     background-color: lightblue;

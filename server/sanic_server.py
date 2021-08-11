@@ -204,7 +204,7 @@ async def market(request, date):
     if init:
         file = 'storage//'+date+'_zhishu.json'
         if os.path.exists(file):
-            with open('storage//'+time.strftime('%Y%m%d')+'_zhishu.json', 'r') as f:
+            with open(file, 'r') as f:
                 result['zhishu'] = json.load(f)
         else:
             tdx = TDX()

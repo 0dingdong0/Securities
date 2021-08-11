@@ -37,10 +37,6 @@ window.onload = function () {
         // 'timestamp' : 1626059575
     }
 
-    let zhangting = new Zhangting('#zhangting')
-    let zhangsu = new Zhangsu('#zhangsu')
-    let stocks = new Stocks('#stock-list')
-
     axios.get(`/market/${date}`, { 'params': params })
         .then((response) => {
 
@@ -147,7 +143,7 @@ class Stocks {
         this.sort_column = 'zhangfu'
         this.ascending = false
         this.stocks = d3.select(`${container_selector} tbody`)
-        // this.symbols = []
+        this.indices = []
 
         let that = this
         this.stocks.on('click', (e)=>{
@@ -160,6 +156,10 @@ class Stocks {
                 column = 'liangbi'
             }else if(e.target.classList.contains('zhangfu')){
                 column = 'zhangfu'
+            }else if(e.target.classList.contains('now')){
+                column = 'now'
+            }else if(e.target.classList.contains('mcap')){
+                column = 'mcap'
             }
 
             if(!column){
@@ -177,35 +177,53 @@ class Stocks {
     }
 
     update(){
+
         let dd = data[date]
         let data_stocks = []
 
+        
         let indices = undefined
-        if(this.sort_column == 'zhangfu'){
+        if(this.indices){
+            indices = this.indices
+        }else{
             indices = dd.zf_indices
-        }else if(this.sort_column == 'liangbi'){
-            indices = dd.lb_indices
         }
         
-        if(!this.ascending){
-            indices = indices.slice().reverse()
-        }
-
-        for(let _ of indices.slice(0,200)){
+        for(let _ of indices){
             let symbol = dd.symbols[_]
             let name = dd.names[_]
-            let zhangfu = dd.zhangfu[_].toFixed(2)
-            let liangbi = dd.liangbi[_].toFixed(1)
+            let zhangfu = dd.zhangfu[_]
+            let liangbi = dd.liangbi[_]
             let now = dd.snapshot[_][2]
             let mcap = dd.mcap[_]
             data_stocks.push([symbol, name, now, zhangfu, liangbi, mcap])
         }
 
+        let idx_sort = undefined
+        if(this.sort_column == "zhangfu"){
+            idx_sort = 3
+        }else if(this.sort_column == "liangbi"){
+            idx_sort = 4
+        }else  if(this.sort_column == "now"){
+            idx_sort = 2
+        }else if(this.sort_column == "mcap"){
+            idx_sort = 5
+        }
+
+        if(idx_sort){
+            if(!this.ascending){
+                data_stocks.sort((a,b)=>{return b[idx_sort]-a[idx_sort]})
+            }else{
+                data_stocks.sort((a,b)=>{return a[idx_sort]-b[idx_sort]})
+            }
+        }
+        
+
         this.stocks.selectAll('tr')
-            .data(data_stocks)
+            .data(data_stocks.slice(0, 500))
             .join('tr')
             .attr('class', d=>`_${d[0]}`)
-            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="now">${d[2]}</td><td class="zhangfu">${d[3]}</td><td class="liangbi">${d[4]}</td><td class="mcap">${d[5]}</td>`)
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="now">${d[2]}</td><td class="zhangfu">${d[3].toFixed(2)}</td><td class="liangbi">${d[4].toFixed(1)}</td><td class="mcap">${d[5]}</td>`)
     }
 }
 
@@ -408,6 +426,13 @@ class Zhangting {
 
 }
 
+
+
+let zhangting = new Zhangting('#zhangting')
+let zhangsu = new Zhangsu('#zhangsu')
+let stocks = new Stocks('#stock-list')
+
+
 let update_ui_size = function(){
     let width_zhangting_panel = document.querySelector('#zhangting-panel').clientWidth
     let height_zhangting_panel = document.querySelector('#zhangting-panel').clientHeight
@@ -460,7 +485,13 @@ d3.select('body').on('click', (e)=>{
         }
     }
 
-    mark_relative()
+    let dd = data[date]
+    let relative_symbols = mark_relative()
+    
+    if(relative_symbols && !relative_symbols[0].startsWith('8')){
+        stocks.indices = relative_symbols.map(item=>dd.symbols.indexOf(item)).filter(item=>item!==-1)
+        stocks.update()
+    }
 })
 
 function keep_selection(){
@@ -499,6 +530,7 @@ function mark_relative(){
 
     if(symbols.length){
         add_class('relative', symbols)
+        return symbols
     }
 }
 
