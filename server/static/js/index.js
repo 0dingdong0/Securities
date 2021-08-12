@@ -69,11 +69,12 @@ window.onload = function () {
                     zhangting.add_symbols(result.zt_status, result.check_point_idx)
                     zhangsu.update()
                     stocks.update()
+                    custom_stocks.update()
 
                     keep_selection()
                 }
 
-                console.log(result);
+                // console.log(result);
             };
             socket.onclose = function (event) {
                 console.log('closed')
@@ -104,7 +105,8 @@ window.onload = function () {
                     'zhangfu': result.zhangfu,
                     'zhangsu': result.zhangsu,
                     'liangbi': result.liangbi,
-                    'snapshot': result.snapshot
+                    'snapshot': result.snapshot,
+                    'lists': result.lists
                 }
                 
                 let zt_status = result.zt_status.filter(
@@ -126,7 +128,7 @@ window.onload = function () {
                 zhangting.add_symbols(zt_status, result.check_point_idx)
                 zhangsu.update()
                 stocks.update()
-
+                custom_stocks.update()
                 keep_selection()
             }
             
@@ -135,6 +137,98 @@ window.onload = function () {
             console.log(error)
         })
 
+}
+
+class CustomStocks{
+
+    constructor(container_selector){
+        this._temp = []
+        this.selector = container_selector
+        this.tbody = d3.select(`${container_selector} tbody`)
+    }
+
+    add(symbol){
+        let dd = data[date]
+        let idx = dd.symbols.indexOf(symbol)
+        this._temp.push(symbol)
+        if(!(this.selector in dd.lists.stocks)){
+            dd.lists.stocks[this.selector] = []
+        }
+        dd.lists.stocks[this.selector].push([symbol, dd.names[idx], moment().unix(), dd.snapshot[idx][2]])
+        this.update()
+    }
+
+    update(saved=false){
+        if(saved){
+            this._temp = []
+        }
+
+        let dd = data[date]
+        let list = []
+        if(this.selector in dd.lists.stocks){
+            list = dd.lists.stocks[this.selector]
+        }
+        
+        let that = this
+        this.tbody.selectAll('tr')
+            .data(list)
+            .join('tr')
+            .attr('class', d=>that._temp.indexOf(d[0])==-1 ? `_${d[0]}` : `_${d[0]} not-saved`)
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td><td class="add-price">${d[3]}</td><td class="now">${dd.snapshot[dd.symbols.indexOf(d[0])][2]}</td>`)
+    }
+}
+
+class CustomZhishu{
+
+    constructor(container_selector){
+        this._temp = []
+        this.selector = container_selector
+        this.tbody = d3.select(`${container_selector} tbody`)
+    }
+
+    add(symbol){
+        let dd = data[date]
+        this._temp.push(symbol)
+        if(!(this.selector in dd.lists.zhishu)){
+            dd.lists.zhishu[this.selector] = []
+        }
+        dd.lists.zhishu[this.selector].push([symbol, dd.zhishu[symbol].name, moment().unix()])
+        this.update()
+    }
+
+    update(saved=false){
+        if(saved){
+            this._temp = []
+        }
+
+        let dd = data[date]
+        let list = []
+        if(this.selector in dd.lists.zhishu){
+            list = dd.lists.zhishu[this.selector]
+        }
+        
+        let that = this
+        this.tbody.selectAll('tr')
+            .data(list)
+            .join('tr')
+            .attr('class', d=>that._temp.indexOf(d[0])==-1 ? `_${d[0]}` : `_${d[0]} not-saved`)
+            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td>`)
+    }
+}
+
+class Zhishu{
+    constructor(container_selector){
+        this.symbols = []
+        this.tbody = d3.select(`${container_selector} tbody`)
+    }
+    update(){
+        let dd = data[date]
+        this.tbody.selectAll('tr')
+            .data(this.symbols)
+            .join('tr')
+            .attr('class', d=>`_${d}`)
+            .html(d=>`<td class="symbol">${d}</td><td class="name">${dd.zhishu[d].name}</td>`)
+    }
 }
 
 class Stocks {
@@ -431,7 +525,10 @@ class Zhangting {
 let zhangting = new Zhangting('#zhangting')
 let zhangsu = new Zhangsu('#zhangsu')
 let stocks = new Stocks('#stock-list')
+let zhishu = new Zhishu('#zhishu-list')
 
+let custom_zhishu = new CustomZhishu('#custom-zhishu-list-1')
+let custom_stocks = new CustomStocks('#custom-stock-list-1')
 
 let update_ui_size = function(){
     let width_zhangting_panel = document.querySelector('#zhangting-panel').clientWidth
@@ -490,6 +587,14 @@ d3.select('body').on('click', (e)=>{
     
     if(relative_symbols && !relative_symbols[0].startsWith('8')){
         stocks.indices = relative_symbols.map(item=>dd.symbols.indexOf(item)).filter(item=>item!==-1)
+        stocks.update()
+    }else if(relative_symbols && relative_symbols[0].startsWith('8')){
+        zhishu.symbols = relative_symbols
+        zhishu.update()
+    }else{
+        zhishu.symbols = []
+        zhishu.update()
+        stocks.indices = []
         stocks.update()
     }
 })

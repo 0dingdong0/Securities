@@ -43,7 +43,6 @@ app.ctx.aredis = StrictRedis(
     decode_responses=True
 )
 
-
 async def load_lists():
     result = await app.ctx.aredis.get('lists')
     if result:
@@ -52,8 +51,6 @@ async def load_lists():
     else:
         print("init app.ctx.lists with {'stocks': {}, 'zhishu': {}}")
         app.ctx.lists = {'stocks': {}, 'zhishu': {}}
-
-asyncio.create_task(load_lists())
 
 
 async def save_list():
@@ -90,6 +87,7 @@ async def snapshot_handler(results):
 # before server start
 @app.before_server_start
 async def setup_dailydata(app, loop):
+    await load_lists()
     # date = time.strftime('%Y%m%d')
     # date = '20210712'
     # app.ctx.data[date] = DailyData(date)
@@ -212,6 +210,7 @@ async def market(request, date):
     result['zhangsu'] = dailydata.statistic[check_point_idx, :, 3].tolist()
     result['zhangfu'] = dailydata.statistic[check_point_idx, :, 0].tolist()
     result['liangbi'] = dailydata.statistic[check_point_idx, :, 2].tolist()
+    result['lists'] = app.ctx.lists
 
     init = request.args.get("init")
     if init:
