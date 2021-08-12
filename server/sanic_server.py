@@ -35,16 +35,29 @@ app.static("/", "server/static/html/index.html")
 with open(os.path.join(os.getcwd(), 'config.json')) as file:
     app.ctx.config = json.load(file)
 
-if 'redis' in app.ctx.config:
-    app.ctx.redis = redis.Redis(
-        host=app.ctx.config['redis']['host'],
-        port=app.ctx.config['redis']['port'],
-        db=app.ctx.config['redis']['db'],
-        password=app.ctx.config['redis']['password'],
-        decode_responses=True
-    )
-    # print(app.ctx.redis.get('tem'))
+app.ctx.aredis = StrictRedis(
+    host=app.ctx.config['redis']['host'],
+    port=app.ctx.config['redis']['port'],
+    db=app.ctx.config['redis']['db'],
+    password=app.ctx.config['redis']['password'],
+    decode_responses=True
+)
 
+
+async def load_lists():
+    result = await app.ctx.aredis.get('lists')
+    if result:
+        app.ctx.lists = json.loads(result)
+        print('lists from '+app.ctx.config['redis']['host']+' was loaded.')
+    else:
+        print("init app.ctx.lists with {'stocks': {}, 'zhishu': {}}")
+        app.ctx.lists = {'stocks': {}, 'zhishu': {}}
+
+asyncio.create_task(load_lists())
+
+
+async def save_list():
+    await app.ctx.aredis.set('lists', json.dumps(app.ctx.lists))
 
 app.ctx.ar = StrictRedis(host='127.0.0.1', port=6379, db=8)
 
