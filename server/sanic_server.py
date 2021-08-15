@@ -52,10 +52,6 @@ async def load_lists():
         print("init app.ctx.lists with {'stocks': {}, 'zhishu': {}}")
         app.ctx.lists = {'stocks': {}, 'zhishu': {}}
 
-
-async def save_list():
-    await app.ctx.aredis.set('lists', json.dumps(app.ctx.lists))
-
 app.ctx.ar = StrictRedis(host='127.0.0.1', port=6379, db=8)
 
 # todo: setup app.ctx.data = {}, date => dailydata
@@ -166,6 +162,11 @@ async def get_dailydata(date):
 
     return app.ctx.data[date]
 
+@app.patch('/lists')
+async def save_list(request):
+    await app.ctx.aredis.set('lists', json.dumps(request.json))
+    app.ctx.lists = request.json
+    return response.json(app.ctx.lists)
 
 @app.get("/market/<date:\d{8}>")
 async def market(request, date):
@@ -256,6 +257,10 @@ async def fenshi(request, symbol):
         ts = time.time()
     return response.text(f'Hello, world! {date} {ts}')
 
+
+@app.websocket('/charts/<ws_client_id>')
+async def charts(request, ws, ws_client_id):
+    pass
 
 @app.websocket("/websocket/<ws_client_id>")
 async def websocket(request, ws, ws_client_id):

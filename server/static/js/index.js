@@ -17,7 +17,7 @@
 //     console.log('Message from server ', event.data);
 // });
 
-let date = '20210810'
+let date = '20210812'
 const data = {}
 let socket = undefined
 let selected_symbols = []
@@ -69,7 +69,9 @@ window.onload = function () {
                     zhangting.add_symbols(result.zt_status, result.check_point_idx)
                     zhangsu.update()
                     stocks.update()
-                    custom_stocks.update()
+                    for(let list of custom_lists.stocks){
+                        list.update()
+                    }
 
                     keep_selection()
                 }
@@ -128,7 +130,12 @@ window.onload = function () {
                 zhangting.add_symbols(zt_status, result.check_point_idx)
                 zhangsu.update()
                 stocks.update()
-                custom_stocks.update()
+                for(let list of custom_lists.stocks){
+                    list.update()
+                }
+                for(let list of custom_lists.zhishu){
+                    list.update()
+                }
                 keep_selection()
             }
             
@@ -143,12 +150,18 @@ class CustomStocks{
 
     constructor(container_selector){
         this._temp = []
+        this._removed = []
         this.selector = container_selector
         this.tbody = d3.select(`${container_selector} tbody`)
     }
 
     add(symbol){
         let dd = data[date]
+        
+        if(dd.lists.stocks[this.selector] && dd.lists.stocks[this.selector].map(e=>e[0]).indexOf(symbol) !== -1){
+            return
+        }
+
         let idx = dd.symbols.indexOf(symbol)
         this._temp.push(symbol)
         if(!(this.selector in dd.lists.stocks)){
@@ -158,9 +171,31 @@ class CustomStocks{
         this.update()
     }
 
-    update(saved=false){
-        if(saved){
-            this._temp = []
+    mark_remove(){
+        let dd = data[date]
+        let symbols = dd.lists.stocks[this.selector].map(e=>e[0])
+        for(let symbol of selected_symbols){
+            if(!symbol.startsWith('8') && symbols.indexOf(symbol)!==-1){
+                if(this._temp.indexOf(symbol)!==-1){
+                    this._temp = this._temp.filter(e=>e!==symbol)
+                    dd.lists.stocks[this.selector] = dd.lists.stocks[this.selector].filter(e=>e[0]!==symbol)
+                }else{
+                    this._removed.push(symbol)
+                }
+            }
+        }
+        this.update()
+    }
+
+    remove(symbols=[]){
+        let dd = data[date]
+        this._removed = this._removed.filter(e=>symbols.indexOf(e)!==-1)
+        dd.lists.stocks[this.selector] = dd.lists.stocks[this.selector].filter(e=>symbols.indexOf(e[0])!==-1 || this._temp.indexOf(e[0])!==-1)
+    }
+
+    update(symbols=[]){
+        if(symbols.length){
+            this._temp = this._temp.filter( e => symbols.indexOf(e)===-1)
         }
 
         let dd = data[date]
@@ -173,8 +208,17 @@ class CustomStocks{
         this.tbody.selectAll('tr')
             .data(list)
             .join('tr')
-            .attr('class', d=>that._temp.indexOf(d[0])==-1 ? `_${d[0]}` : `_${d[0]} not-saved`)
-            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td><td class="add-price">${d[3]}</td><td class="now">${dd.snapshot[dd.symbols.indexOf(d[0])][2]}</td>`)
+            .attr('class', (d)=>{
+                if(that._temp.indexOf(d[0])!==-1){
+                    return `_${d[0]} not-saved`
+                }else if(that._removed.indexOf(d[0])!==-1){
+                    return `_${d[0]} removed`
+                }else if(selected_symbols.indexOf(d[0])!==-1){
+                    return `_${d[0]} selected`
+                }else{
+                    return `_${d[0]}`
+                }
+            }).html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td><td class="add-price">${d[3]}</td><td class="now">${dd.snapshot[dd.symbols.indexOf(d[0])][2]}</td>`)
     }
 }
 
@@ -182,23 +226,52 @@ class CustomZhishu{
 
     constructor(container_selector){
         this._temp = []
+        this._removed = []
         this.selector = container_selector
         this.tbody = d3.select(`${container_selector} tbody`)
     }
 
     add(symbol){
         let dd = data[date]
+        
+        if(dd.lists.zhishu[this.selector] && dd.lists.zhishu[this.selector].map(e=>e[0]).indexOf(symbol) !== -1){
+            return
+        }
+
         this._temp.push(symbol)
         if(!(this.selector in dd.lists.zhishu)){
             dd.lists.zhishu[this.selector] = []
         }
+        
         dd.lists.zhishu[this.selector].push([symbol, dd.zhishu[symbol].name, moment().unix()])
         this.update()
     }
 
-    update(saved=false){
-        if(saved){
-            this._temp = []
+    mark_remove(){
+        let dd = data[date]
+        let symbols = dd.lists.zhishu[this.selector].map(e=>e[0])
+        for(let symbol of selected_symbols){
+            if(symbol.startsWith('8') && symbols.indexOf(symbol)!==-1){
+                if(this._temp.indexOf(symbol)!==-1){
+                    this._temp = this._temp.filter(e=>e!==symbol)
+                    dd.lists.zhishu[this.selector] = dd.lists.zhishu[this.selector].filter(e=>e[0]!==symbol)
+                }else{
+                    this._removed.push(symbol)
+                }
+            }
+        }
+        this.update()
+    }
+
+    remove(symbols=[]){
+        let dd = data[date]
+        this._removed = this._removed.filter(e=>symbols.indexOf(e)!==-1)
+        dd.lists.zhishu[this.selector] = dd.lists.zhishu[this.selector].filter(e=>symbols.indexOf(e[0])!==-1 || this._temp.indexOf(e[0])!==-1)
+    }
+
+    update(symbols=[]){
+        if(symbols.length){
+            this._temp = this._temp.filter( e => symbols.indexOf(e)===-1)
         }
 
         let dd = data[date]
@@ -211,8 +284,17 @@ class CustomZhishu{
         this.tbody.selectAll('tr')
             .data(list)
             .join('tr')
-            .attr('class', d=>that._temp.indexOf(d[0])==-1 ? `_${d[0]}` : `_${d[0]} not-saved`)
-            .html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td>`)
+            .attr('class', (d)=>{
+                if(that._temp.indexOf(d[0])!==-1){
+                    return `_${d[0]} not-saved`
+                }else if(that._removed.indexOf(d[0])!==-1){
+                    return `_${d[0]} removed`
+                }else if(selected_symbols.indexOf(d[0])!==-1){
+                    return `_${d[0]} selected`
+                }else{
+                    return `_${d[0]}`
+                }
+            }).html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td>`)
     }
 }
 
@@ -527,8 +609,10 @@ let zhangsu = new Zhangsu('#zhangsu')
 let stocks = new Stocks('#stock-list')
 let zhishu = new Zhishu('#zhishu-list')
 
-let custom_zhishu = new CustomZhishu('#custom-zhishu-list-1')
-let custom_stocks = new CustomStocks('#custom-stock-list-1')
+let custom_lists = {
+    'zhishu':[new CustomZhishu('#custom-zhishu-list-0'), new CustomZhishu('#custom-zhishu-list-1')],
+    'stocks':[new CustomStocks('#custom-stocks-list-0'), new CustomStocks('#custom-stocks-list-1')]
+}
 
 let update_ui_size = function(){
     let width_zhangting_panel = document.querySelector('#zhangting-panel').clientWidth
@@ -551,6 +635,17 @@ d3.select('body').on('click', (e)=>{
     if(!el){
         return
     }
+
+    let clicked = document.querySelector('.clicked')
+    if(clicked){
+        clicked.classList.remove('clicked')
+    }
+    let container = el.parentNode
+    while(container.tagName !== 'DIV'){
+        container = container.parentNode
+    }
+    container.classList.add('clicked')
+
 
     for(let cls of el.classList){
         if(/_\d\d\d\d\d\d/.test(`${cls}`)){
@@ -673,5 +768,163 @@ function toggle_class(class_name, symbols=undefined){
     
     for(let el of elements){
         el.classList.toggle(class_name)
+    }
+}
+
+window.onkeyup = function(e){
+
+    if(/Numpad\d/.test(e.code) && e.altKey){
+        let idx = parseInt(e.key)
+
+        for(let symbol of selected_symbols){
+            if(symbol.startsWith('8') && idx < custom_lists.zhishu.length){
+                custom_lists.zhishu[idx].add(symbol)
+            }else if( !symbol.startsWith('8') && idx < custom_lists.stocks.length) {
+                custom_lists.stocks[idx].add(symbol)
+            }
+        }
+    }else if(e.code == 'KeyS' && e.shiftKey){
+
+        let dd = data[date]
+        let lists = {}
+        
+        for(let group in dd.lists){
+            lists[group] = {}
+            for(let key in dd.lists[group]){
+                lists[group][key] = dd.lists[group][key].slice()
+                for(let item of custom_lists[group]){
+                    if(item.selector==key){
+                        lists[group][key] = lists[group][key].filter(e=>item._removed.indexOf(e[0])===-1)
+                    }
+                }
+            }
+        }
+        // console.log(lists)
+        // return
+        axios.patch('/lists', lists)
+        .then((response) => {
+            let symbols_zhishu = []
+            console.log(response.data)
+            for(let key in response.data.zhishu){
+                for(let symbol of response.data.zhishu[key]){
+                    symbols_zhishu.push(symbol[0])
+                }
+            }
+            let symbols_stocks = []
+            for(let key in response.data.stocks){
+                for(let symbol of response.data.stocks[key]){
+                    symbols_stocks.push(symbol[0])
+                }
+            }
+            for(let item of custom_lists.zhishu){
+                item.remove(symbols_zhishu)
+                item.update(symbols_zhishu)
+            }
+            for(let item of custom_lists.stocks){
+                item.remove(symbols_stocks)
+                item.update(symbols_stocks)
+            }
+            for(let container of document.querySelectorAll('.save-needed')){
+                container.classList.remove('save-needed')
+            }
+        }).catch((error) => {
+            console.log(error)
+        })
+
+    }else if(e.code == 'Delete'){
+        for(let item of custom_lists.zhishu){
+                item.mark_remove()
+        }
+        for(let item of custom_lists.stocks){
+                item.mark_remove()
+        }
+    }else if(e.code == 'ArrowUp' && e.ctrlKey){
+        let container = document.querySelector('.clicked')
+        if(!container){
+            return
+        }
+        let id = container.getAttribute('id')
+        if(!id.startsWith('custom-')){
+            return
+        }
+        let group = id.split('-')[1]
+        let save_needed = false
+        for(let item of custom_lists[group]){
+
+            if('#'+id !== item.selector){
+                continue
+            }
+            let list = data[date].lists[group]['#'+id]
+            let indices = []
+            for(let _=0; _<list.length; _++ ){
+                let item = list[_]
+                let symbol = item[0]
+                if(selected_symbols.indexOf(symbol)!==-1){
+                    if(_==0){
+                        indices.push(_)
+                        continue
+                    }
+                    if(indices.indexOf(_-1)!==-1){
+                        indices.push(_)
+                        continue
+                    }
+                    let temp = list[_-1]
+                    list[_-1] = list[_]
+                    list[_] = temp
+                    indices.push(_-1)
+                    save_needed = true
+                }
+            }
+            item.update()
+            break
+        }
+
+        if(save_needed){
+            container.classList.add('save-needed')
+        }
+    }else if(e.code == 'ArrowDown' && e.ctrlKey){
+        let container = document.querySelector('.clicked')
+        if(!container){
+            return
+        }
+        let id = container.getAttribute('id')
+        if(!id.startsWith('custom-')){
+            return
+        }
+        let group = id.split('-')[1]
+        let save_needed = false
+        for(let item of custom_lists[group]){
+
+            if('#'+id !== item.selector){
+                continue
+            }
+            let list = data[date].lists[group]['#'+id]
+            let indices = []
+            for(let _=list.length-1; _>=0; _-- ){
+                let item = list[_]
+                let symbol = item[0]
+                if(selected_symbols.indexOf(symbol)!==-1){
+                    if(_==list.length-1){
+                        indices.push(_)
+                        continue
+                    }
+                    if(indices.indexOf(_+1)!==-1){
+                        indices.push(_)
+                        continue
+                    }
+                    let temp = list[_+1]
+                    list[_+1] = list[_]
+                    list[_] = temp
+                    indices.push(_+1)
+                    save_needed=true
+                }
+            }
+            item.update()
+            break
+        }
+        
+        if(save_needed){
+            container.classList.add('save-needed')
+        }
     }
 }
