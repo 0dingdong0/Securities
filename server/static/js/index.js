@@ -42,7 +42,7 @@ window.onload = function () {
 
             socket = new WebSocket(`ws://127.0.0.1:8000/websocket/${moment().format('x')}`)
             socket.onopen = function (event) {
-                socket.send("Hello!");
+                socket.send('{"cmd": "Hello!"}');
             };
             socket.onmessage = function (event) {
                 // console.log(event.data);
@@ -209,15 +209,18 @@ class CustomStocks{
             .data(list)
             .join('tr')
             .attr('class', (d)=>{
+                let cls = `_${d[0]}`
                 if(that._temp.indexOf(d[0])!==-1){
-                    return `_${d[0]} not-saved`
-                }else if(that._removed.indexOf(d[0])!==-1){
-                    return `_${d[0]} removed`
-                }else if(selected_symbols.indexOf(d[0])!==-1){
-                    return `_${d[0]} selected`
-                }else{
-                    return `_${d[0]}`
+                    cls = `${cls} not-saved`
                 }
+                if(that._removed.indexOf(d[0])!==-1){
+                    cls = `${cls} removed`
+                }
+                
+                if(selected_symbols.indexOf(d[0])!==-1){
+                    cls = `${cls} selected`
+                }
+                return cls
             }).html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td><td class="add-price">${d[3]}</td><td class="now">${dd.snapshot[dd.symbols.indexOf(d[0])][2]}</td>`)
     }
 }
@@ -285,15 +288,19 @@ class CustomZhishu{
             .data(list)
             .join('tr')
             .attr('class', (d)=>{
+                let cls = `_${d[0]}`
                 if(that._temp.indexOf(d[0])!==-1){
-                    return `_${d[0]} not-saved`
-                }else if(that._removed.indexOf(d[0])!==-1){
-                    return `_${d[0]} removed`
-                }else if(selected_symbols.indexOf(d[0])!==-1){
-                    return `_${d[0]} selected`
-                }else{
-                    return `_${d[0]}`
+                    cls = `${cls} not-saved`
                 }
+                if(that._removed.indexOf(d[0])!==-1){
+                    cls = `${cls} removed`
+                }
+                
+                if(selected_symbols.indexOf(d[0])!==-1){
+                    cls = `${cls} selected`
+                }
+                console.log(cls)
+                return cls
             }).html(d=>`<td class="symbol">${d[0]}</td><td class="name">${d[1]}</td><td class="added-at">${moment.unix(d[2]).format('MM-DD HH:mm')}</td>`)
     }
 }
@@ -926,5 +933,9 @@ window.onkeyup = function(e){
         if(save_needed){
             container.classList.add('save-needed')
         }
+    }else if(e.code == 'ArrowRight'){
+        let symbols = ['002717', '300589']
+        let message = {'cmd': 'charts', 'symbols': symbols}
+        socket.send(JSON.stringify(message));
     }
 }

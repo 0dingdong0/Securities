@@ -260,12 +260,8 @@ async def fenshi(request, symbol):
 
 @app.websocket('/charts/<ws_client_id>')
 async def charts(request, ws, ws_client_id):
-    pass
-
-@app.websocket("/websocket/<ws_client_id>")
-async def websocket(request, ws, ws_client_id):
     try:
-        print('websocket_client_id:', ws_client_id)
+        print('/charts/<ws_client_id>, websocket_client_id:', ws_client_id)
         queue = asyncio.Queue()
         if request.ctx.user_id not in app.ctx.queues:
             app.ctx.queues[request.ctx.user_id] = {}
@@ -285,10 +281,79 @@ async def websocket(request, ws, ws_client_id):
             for task in done:
                 task_name = task.get_name()
                 result = task.result()
-                print('====', task_name, type(result), result)
+                print('===>>> /charts/ws_client_id', task_name, type(result), result)
                 if task_name == 'ws.recv()':
                     tasks.append(asyncio.create_task(
                         ws.recv(), name='ws.recv()'))
+                else:
+                    tasks.append(asyncio.create_task(
+                        queue.get(), name='queue.get()'))
+
+                    if result['cmd'] == 'snapshot':
+                        start = time.time()
+                        dailydata = await get_dailydata(result['date'])
+
+                        check_point_idx = result['idx']
+                        del result['idx']
+
+                        result['check_point_idx'] = check_point_idx
+
+                        result['snapshot'] = dailydata.snapshots[check_point_idx].tolist()
+                        # result['liangbi'] = dailydata.statistic[check_point_idx, :, 2].tolist()
+
+                        asyncio.create_task(ws.send(json.dumps(result)))
+                    elif result['cmd'] == 'charts':
+                        pass
+
+
+    except Exception as e:
+        print(str(e))
+        traceback.print_exc()
+
+    finally:
+        # remove queue from app.ctx.queues
+        del app.ctx.queues[request.ctx.user_id][ws_client_id]
+        # cancel running tasks
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+
+@app.websocket("/websocket/<ws_client_id>")
+async def websocket(request, ws, ws_client_id):
+    try:
+        print('/websocket/<ws_client_id>, websocket_client_id:', ws_client_id)
+        queue = asyncio.Queue()
+        if request.ctx.user_id not in app.ctx.queues:
+            app.ctx.queues[request.ctx.user_id] = {}
+        app.ctx.queues[request.ctx.user_id][ws_client_id] = queue
+
+        tasks = [
+            asyncio.create_task(ws.recv(), name='ws.recv()'),
+            asyncio.create_task(queue.get(), name='queue.get()')
+        ]
+
+        while True:
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+            tasks = list(pending)
+
+            print('done tasks:')
+            for task in done:
+                task_name = task.get_name()
+                result = task.result()
+                print('===>>> /websocket/<ws_client_id>', task_name, type(result), result)
+                if task_name == 'ws.recv()':
+                    tasks.append(asyncio.create_task(
+                        ws.recv(), name='ws.recv()'))
+                    result = json.loads(result)
+                    if result['cmd'] == 'charts':
+                        for wsc_id in app.ctx.queues[request.ctx.user_id]:
+                            if wsc_id == ws_client_id:
+                                continue
+                            app.ctx.queues[request.ctx.user_id][wsc_id].put(result)
                 else:
                     tasks.append(asyncio.create_task(
                         queue.get(), name='queue.get()'))
@@ -330,8 +395,8 @@ async def websocket(request, ws, ws_client_id):
                             ) for idx in np.argwhere(zhangting)
                         ])
 
-                        print('websocket ===============>>>', time.time() -
-                              start, np.argwhere(not_zhangting == zhangting))
+                        # print('websocket ===============>>>', time.time() -
+                        #       start, np.argwhere(not_zhangting == zhangting))
                         asyncio.create_task(ws.send(json.dumps(result)))
 
             # break
