@@ -124,40 +124,72 @@ div#stock-list{
     background-color: black;
 }
 
+#custom-zhishu-list-0{
+    position: absolute;
+    padding-left:5px;
+    top:0px;
+    bottom:0px;
+    left:825px;
+    width:210px;
+    background-color: black;
+}
+
+#custom-stocks-list-0{
+    position: absolute;
+    padding-left:5px;
+    top:0px;
+    bottom:0px;
+    left:1040px;
+    width:300px;
+    background-color: black;
+}
+
 #custom-zhishu-list-1{
     position: absolute;
     padding-left:5px;
     top:0px;
     bottom:0px;
-    left:820px;
+    left:1345px;
     width:210px;
     background-color: black;
 }
-#custom-zhishu-list-1 tr.not-saved{
-    color: gray;
-}
-
-#custom-stock-list-1{
+#custom-stocks-list-1{
     position: absolute;
     padding-left:5px;
     top:0px;
     bottom:0px;
-    left:1035px;
-    width:295px;
+    left:1560px;
+    width:300px;
     background-color: black;
 }
-#custom-stock-list-1 tr.not-saved{
+
+#custom-stocks-list-0 tr.not-saved,
+#custom-zhishu-list-0 tr.not-saved,
+#custom-stocks-list-1 tr.not-saved,
+#custom-zhishu-list-1 tr.not-saved{
+    color: gray;
+}
+
+#custom-stocks-list-0 tr.removed,
+#custom-zhishu-list-0 tr.removed,
+#custom-stocks-list-1 tr.removed,
+#custom-zhishu-list-1 tr.removed{
+    text-decoration: line-through;
     color: gray;
 }
 
 #zhangting .stocks>span.selected,
 tbody tr.selected{
     color: black;
-    background-color: lightyellow;
+    background-color: #ffe9e0;
 }
 #zhangting .stocks>span.selected.lanban{
     color: grey;
-    background-color: lightyellow;
+    background-color: #ffe9e0;
+}
+
+.clicked .selected{
+    background-color:lightyellow !important;
 }
 
 .relative{
@@ -173,4 +205,8 @@ tbody tr.selected{
 span.relative.lanban{
     color: grey;
     background-color: lightblue;
+}
+
+.save-needed{
+    border-top: 2px solid green;
 }
