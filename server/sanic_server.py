@@ -31,6 +31,7 @@ app = Sanic("My Hello, world app")
 app.static("/favicon.ico", "server/static/favicon.png")
 app.static("/static", "server/static/")
 app.static("/", "server/static/html/index.html")
+app.static("/charts", "server/static/html/charts.html")
 
 with open(os.path.join(os.getcwd(), 'config.json')) as file:
     app.ctx.config = json.load(file)
@@ -303,6 +304,9 @@ async def charts(request, ws, ws_client_id):
 
                         asyncio.create_task(ws.send(json.dumps(result)))
                     elif result['cmd'] == 'charts':
+                        for symbol in result['symbols']:
+                            pass
+                        asyncio.create_task(ws.send(json.dumps(result)))
                         pass
 
 
@@ -351,9 +355,11 @@ async def websocket(request, ws, ws_client_id):
                     result = json.loads(result)
                     if result['cmd'] == 'charts':
                         for wsc_id in app.ctx.queues[request.ctx.user_id]:
+                            print(wsc_id, ws_client_id)
                             if wsc_id == ws_client_id:
                                 continue
-                            app.ctx.queues[request.ctx.user_id][wsc_id].put(result)
+                            print('=========+++++++++++++++', result)
+                            await app.ctx.queues[request.ctx.user_id][wsc_id].put(result)
                 else:
                     tasks.append(asyncio.create_task(
                         queue.get(), name='queue.get()'))
