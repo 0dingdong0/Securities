@@ -144,6 +144,7 @@ class DailyData:
         self.post_init()
 
     def post_init(self):
+        self.active_time_blocks = []
         self.check_interval = self.check_points[2] - self.check_points[1]
         start_time_0_str = f'{time.strftime("%Y-%m-%d", time.localtime(self.check_points[0]))} 09:15:00'
         start_time_1_str = f'{time.strftime("%Y-%m-%d", time.localtime(self.check_points[0]))} 09:30:00'
@@ -164,20 +165,34 @@ class DailyData:
         end_time_2 = int(time.mktime(time.strptime(
             end_time_2_str, '%Y-%m-%d %H:%M:%S')))
 
-        start_time_idx_0 = np.where(self.check_points == start_time_0)[0][0]
+        if start_time_0 >= self.check_points[0]:
+            start_time_idx_0 = np.where(
+                self.check_points == start_time_0)[0][0]
+            end_time_idx_0 = np.where(self.check_points == end_time_0)[0][0]
+
+            self.active_time_blocks.append(
+                (
+                    (start_time_idx_0, start_time_0, start_time_0_str),
+                    (end_time_idx_0, end_time_0, end_time_0_str)
+                )
+            )
+
         start_time_idx_1 = np.where(self.check_points == start_time_1)[0][0]
-        start_time_idx_2 = np.where(self.check_points == start_time_2)[0][0]
-        end_time_idx_0 = np.where(self.check_points == end_time_0)[0][0]
         end_time_idx_1 = np.where(self.check_points == end_time_1)[0][0]
+        self.active_time_blocks.append(
+            (
+                (start_time_idx_1, start_time_1, start_time_1_str),
+                (end_time_idx_1, end_time_1, end_time_1_str)
+            )
+        )
+        start_time_idx_2 = np.where(self.check_points == start_time_2)[0][0]
         end_time_idx_2 = np.where(self.check_points == end_time_2)[0][0]
-        self.active_time_blocks = [
-            ((start_time_idx_0, start_time_0, start_time_0_str),
-             (end_time_idx_0, end_time_0, end_time_0_str)),
-            ((start_time_idx_1, start_time_1, start_time_1_str),
-             (end_time_idx_1, end_time_1, end_time_1_str)),
-            ((start_time_idx_2, start_time_2, start_time_2_str),
-             (end_time_idx_2, end_time_2, end_time_2_str))
-        ]
+        self.active_time_blocks.append(
+            (
+                (start_time_idx_2, start_time_2, start_time_2_str),
+                (end_time_idx_2, end_time_2, end_time_2_str)
+            )
+        )
         # self.rd.set(f'{self.date}_data_ready', 'true')
 
     def get_securities(self):
@@ -378,8 +393,8 @@ class DailyData:
             self.hdf5 = h5py.File(self.hdf5_file, 'r+')
 
         self.hdf5[u'snapshots'][idx] = self.snapshots[idx]
-        
-        if (idx+1)==len(self.check_points):
+
+        if (idx+1) == len(self.check_points):
             self.hdf5.close()
         else:
             self.hdf5.flush()
