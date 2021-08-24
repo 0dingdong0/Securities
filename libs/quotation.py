@@ -209,25 +209,72 @@ class Quotation:
             securities[symbol] = klines[idx]
 
         return securities
-
-    async def min_data(self, symbols):
-        url = 'https://data.gtimg.cn/flashdata/hushen/minute/{}.js'
+    
+    
+    async def min_data(self, symbols=[], coroutines=50, max_retries=2):
+        if not symbols:
+            symbols = self.symbols
+        url = 'https://data.gtimg.cn/flashdata/hushen/minute/{}.js'    
         urls = list(map(
 
-            lambda x: url.format('sh'+x[-6:]) if x[0] == '6' else
-            url.format('sz'+x[-6:]),
+            lambda x: url.format('sh'+x[-6:]) if x[0]=='6' else \
+                      url.format('sz'+x[-6:]),
             symbols
         ))
 
-        sessions = [aiohttp.ClientSession(headers=HEADERS)
-                    for _ in range(len(urls))]
-        results = await asyncio.gather(*[get(sessions[_], urls[_]) for _ in range(len(urls))])
+        sessions = [ aiohttp.ClientSession(headers=HEADERS) for _ in range(min(coroutines, len(urls))) ]
+
+        tasks = [
+            asyncio.create_task(get(sessions[_], urls[_]), name=str(_)+'-0'+urls[_])
+            for _ in range(len(sessions))
+        ]
+
+        urls = urls[len(sessions):]
+
+        results = {}
+        while True:
+
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+            tasks = list(pending)
+
+            for task in done:
+
+                name = task.get_name()
+                _ = name.index('https')
+                url = name[_:]
+                symbol = url[-9:-3]
+                _, retries = [ int(x) for x in name[:_].split('-')]
+
+                if task.exception():
+                    print('failed:', _, retries, url)
+                    if retries < max_retries:
+                        retries += 1
+                    else:
+                        url = None
+                else:
+                    results[symbol] = task.result()
+                    url = None
+
+                if (not url) and urls:
+                    url = urls.pop()
+                    retries = 0
+
+                if url:
+                    tasks.append(asyncio.create_task(get(sessions[_], url), name=str(_)+'-'+str(retries)+url))
+
+
+            if not tasks:
+                break
+
+
         for session in sessions:
             await session.close()
 
         mdata = {}
 
-        for _, result in enumerate(results):
+        for symbol in results:
+            result = results[symbol]
 
             date = re.search('date:(\d+)', result).group(1)
             grep_str = re.compile(r'(\d+) ([\d.]+) (\d+)\\n')
@@ -238,7 +285,7 @@ class Quotation:
                 item = match_object.groups()
                 data.append((item[0], float(item[1]), int(item[2])))
 
-            mdata[symbols[_]] = {
+            mdata[symbol] = {
                 'date': date,
                 'data': data
             }
