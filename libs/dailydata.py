@@ -296,76 +296,87 @@ class DailyData:
         return data
 
     def get_ma5pm_anchor_idx(self, idx):
-        #         st = time.time()
 
-        ck = self.check_points[idx]
-
-        if ck <= self.active_time_blocks[0][0][1]+300:
-            ma5pm_anchor_idx = self.active_time_blocks[0][0][0] - 1
-
-        elif self.active_time_blocks[0][1][1] < ck < self.active_time_blocks[1][0][1]:
-            ma5pm_anchor_idx = int(
-                self.active_time_blocks[0][1][0] - 300/self.check_interval)
-
-        elif self.active_time_blocks[1][0][1] <= ck <= self.active_time_blocks[1][0][1]+300:
-            ma5pm_anchor_idx = self.active_time_blocks[1][0][0] - 1
-
-        elif self.active_time_blocks[1][1][1] < ck < self.active_time_blocks[2][0][1]:
-            ma5pm_anchor_idx = int(
-                self.active_time_blocks[1][1][0] - 300/self.check_interval)
-
-        elif self.active_time_blocks[2][0][1] <= ck <= self.active_time_blocks[2][0][1]+300:
-            result = math.ceil(self.check_points[idx]/60)*60-300
-            offset = int((result-self.check_points[idx])/self.check_interval)
-
-            ma5pm_anchor_idx = int(
-                max(idx+offset-2, self.active_time_blocks[1][1][0] - 240/self.check_interval))
-
-            if ma5pm_anchor_idx == self.active_time_blocks[1][1][0]:
-                ma5pm_anchor_idx += 1
-
-        elif self.active_time_blocks[2][1][1] < ck:
-            ma5pm_anchor_idx = int(
-                self.active_time_blocks[2][1][0]-300/self.check_interval)
-
+        if self.check_interval == 60:
+            if idx <= 121:
+                return max(0, idx-5)
+            elif idx <= 126:
+                return idx-6
+            else:
+                return idx-5
         else:
-            result = math.ceil(self.check_points[idx]/60)*60-300
-            offset = int((result-self.check_points[idx])/self.check_interval)
+            # st = time.time()
 
-            ma5pm_anchor_idx = idx+offset
+            ck = self.check_points[idx]
 
-#         et = time.time()
+            if ck <= self.active_time_blocks[0][0][1]+300:
+                ma5pm_anchor_idx = self.active_time_blocks[0][0][0] - 1
 
-#         print(
-#             idx, ' : ', ma5pm_anchor_idx, '       ',
-#             time.strftime("%H:%M:%S", time.localtime(self.check_points[idx])),
-#             ' ==> ',
-#             time.strftime("%H:%M:%S", time.localtime(self.check_points[ma5pm_anchor_idx])), '       ',
-#             ck, ' : ', self.check_points[ma5pm_anchor_idx], '       ',
-#             et-st
-#         )
+            elif self.active_time_blocks[0][1][1] < ck < self.active_time_blocks[1][0][1]:
+                ma5pm_anchor_idx = int(
+                    self.active_time_blocks[0][1][0] - 300/self.check_interval)
 
-        return ma5pm_anchor_idx
+            elif self.active_time_blocks[1][0][1] <= ck <= self.active_time_blocks[1][0][1]+300:
+                ma5pm_anchor_idx = self.active_time_blocks[1][0][0] - 1
+
+            elif self.active_time_blocks[1][1][1] < ck < self.active_time_blocks[2][0][1]:
+                ma5pm_anchor_idx = int(
+                    self.active_time_blocks[1][1][0] - 300/self.check_interval)
+
+            elif self.active_time_blocks[2][0][1] <= ck <= self.active_time_blocks[2][0][1]+300:
+                result = math.ceil(self.check_points[idx]/60)*60-300
+                offset = int(
+                    (result-self.check_points[idx])/self.check_interval)
+
+                ma5pm_anchor_idx = int(
+                    max(idx+offset-2, self.active_time_blocks[1][1][0] - 240/self.check_interval))
+
+                if ma5pm_anchor_idx == self.active_time_blocks[1][1][0]:
+                    ma5pm_anchor_idx += 1
+
+            elif self.active_time_blocks[2][1][1] < ck:
+                ma5pm_anchor_idx = int(
+                    self.active_time_blocks[2][1][0]-300/self.check_interval)
+
+            else:
+                result = math.ceil(self.check_points[idx]/60)*60-300
+                offset = int(
+                    (result-self.check_points[idx])/self.check_interval)
+
+                ma5pm_anchor_idx = idx+offset
+
+            # et = time.time()
+
+            # print(
+            #     idx, ' : ', ma5pm_anchor_idx, '       ',
+            #     time.strftime("%H:%M:%S", time.localtime(self.check_points[idx])),
+            #     ' ==> ',
+            #     time.strftime("%H:%M:%S", time.localtime(self.check_points[ma5pm_anchor_idx])), '       ',
+            #     ck, ' : ', self.check_points[ma5pm_anchor_idx], '       ',
+            #     et-st
+            # )
+
+            return ma5pm_anchor_idx
 
     def get_time_lapse(self, idx):
 
         ck = self.check_points[idx]
-        offset = 0
-        if ck < self.active_time_blocks[1][0][1]:
-            start_time = self.active_time_blocks[0][0][1]
-            if ck > self.active_time_blocks[0][1][1]:
-                ck = self.active_time_blocks[0][1][1]
-        elif ck < self.active_time_blocks[2][0][1]:
-            start_time = self.active_time_blocks[1][0][1]
-            if ck > self.active_time_blocks[1][1][1]:
-                ck = self.active_time_blocks[1][1][1]
-        else:
-            start_time = self.active_time_blocks[2][0][1]
-            if ck > self.active_time_blocks[2][1][1]:
-                ck = self.active_time_blocks[2][1][1]
-            offset = 120
+        diff_0000 = (ck+28800) % 86400  # 8*3600=28800, 24*3600=86400
 
-        return max(int(math.ceil((ck - start_time)/60)), 1)+offset
+        if diff_0000 <= 33300:  # 09:15:00, 9*3600+15*60=33300
+            return 1
+        elif diff_0000 <= 33900:  # 09:25:00, 9*3600+25*60=33900
+            return math.ceil((diff_0000-33300)/60)
+        elif diff_0000 < 34200:  # 09:30:00, 9*3600+30*60=34200
+            return 10
+        elif diff_0000 <= 41400:  # 11:30:00, 11*3600+30*60=41400
+            return max(1, math.ceil((diff_0000-34200)/60))
+        elif diff_0000 < 46800:  # 13:00:00, 13*3600=46800
+            return 120
+        elif diff_0000 <= 54000:  # 15:00:00, 15*3600=54000
+            return 120+max(1, math.ceil((diff_0000-46800)/60))
+        else:
+            return 240
 
     def close_sharedmemory(self):
         self.shm_symbols.close()
