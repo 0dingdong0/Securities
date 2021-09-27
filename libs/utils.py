@@ -47,6 +47,8 @@ class Utils:
         df = df.loc[df['list_date'] <= time.strftime(
             '%Y%m%d', time.localtime())]
         symbols = df['symbol'].to_list()
+        symbols = list(filter(lambda x: x[:2] in [
+                       '00', '30', '60', '68'], symbols))
         with open(Utils.SYMBOLS_FILE, "w") as f:
             f.write(json.dumps(symbols))
 
